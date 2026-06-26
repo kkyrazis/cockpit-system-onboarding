@@ -120,7 +120,14 @@ generate_ca() {
 
 build_containers() {
     echo ""
-    echo "=== Building container images ==="
+    echo "=== Building agent base image ==="
+    $SUDO_PODMAN build \
+        -t "onboarding-agent-base:latest" \
+        -f "$SCRIPT_DIR/Containerfile.agent-base" \
+        "$SCRIPT_DIR"
+
+    echo ""
+    echo "=== Building role images ==="
     for image in "${IMAGES[@]}"; do
         echo ""
         echo "--- Building onboarding-${image} ---"

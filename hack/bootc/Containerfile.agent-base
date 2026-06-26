@@ -1,0 +1,37 @@
+FROM quay.io/fedora/fedora-bootc:43
+
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
+    curl -fsSLo /etc/yum.repos.d/flightctl-fedora.repo https://rpm.flightctl.io/flightctl-fedora.repo \
+    && curl -fsSLo /etc/yum.repos.d/flightctl-dev.repo \
+    https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/fedora-43/group_redhat-et-flightctl-dev-fedora-43.repo \
+    && dnf install -y \
+    cockpit \
+    cockpit-ws \
+    cockpit-bridge \
+    NetworkManager \
+    NetworkManager-wifi \
+    wpa_supplicant \
+    hostapd \
+    dnsmasq \
+    jq \
+    chrony \
+    iw \
+    wireless-regdb \
+    linux-firmware \
+    openssh-server \
+    flightctl-agent-1.2.0 \
+    flightctl-cli
+
+RUN useradd -m -G wheel testadmin \
+    && echo "testadmin:testadmin" | chpasswd \
+    && echo "testadmin ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/testadmin \
+    && chmod 440 /etc/sudoers.d/testadmin \
+    && mkdir -p /home/testadmin/.ssh \
+    && chmod 700 /home/testadmin/.ssh \
+    && chown -R testadmin:testadmin /home/testadmin/.ssh
+
+RUN systemctl enable cockpit.socket \
+    && systemctl enable sshd
+
+RUN mkdir -p /etc/flightctl/certs
+COPY config/pki/ca.crt /etc/flightctl/certs/ca.crt
