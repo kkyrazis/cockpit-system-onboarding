@@ -59,7 +59,21 @@ build_rpm() {
     rpm=$(find "$REPO_ROOT" -maxdepth 1 -name 'cockpit-system-onboarding-*.noarch.rpm' -print -quit 2>/dev/null)
     if [ -z "$rpm" ]; then
         echo "=== No RPM found, building... ==="
-        (cd "$REPO_ROOT" && make rpm)
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+            # macOS has no rpmbuild — build inside a Fedora container
+            echo "  (building RPM in Fedora container)"
+            podman run --rm \
+                -v "$REPO_ROOT":/src:Z \
+                -w /src \
+                registry.fedoraproject.org/fedora:43 \
+                bash -c '
+                    dnf install -y nodejs npm make rpm-build gettext libappstream-glib git
+                    git config --global --add safe.directory /src
+                    make rpm
+                '
+        else
+            (cd "$REPO_ROOT" && make rpm)
+        fi
         rpm=$(find "$REPO_ROOT" -maxdepth 1 -name 'cockpit-system-onboarding-*.noarch.rpm' -print -quit)
     fi
     if [ -z "$rpm" ]; then
