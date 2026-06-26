@@ -66,18 +66,23 @@ build_rpm() {
                 -t onboarding-builder:latest \
                 -f "$SCRIPT_DIR/Containerfile.builder" \
                 "$SCRIPT_DIR"
+            # Create a clean tarball of the git working tree to avoid
+            # symlink/permission issues when copying through virtiofs
+            local build_tar
+            build_tar=$(mktemp "${TMPDIR:-/tmp}/onboarding-src.XXXXXX.tar")
+            git -C "$REPO_ROOT" archive --format=tar HEAD > "$build_tar"
             $SUDO_PODMAN run --rm \
                 --security-opt label=disable \
-                -v "$REPO_ROOT":/src:ro \
+                -v "$build_tar":/src.tar:ro \
                 -v "$REPO_ROOT":/out \
                 onboarding-builder:latest \
                 bash -c '
-                    cp -a /src /build && cd /build
-                    git config --global --add safe.directory /build
+                    tar xf /src.tar -C /build
                     umask 022
                     make rpm
                     cp cockpit-system-onboarding-*.noarch.rpm /out/
                 '
+            rm -f "$build_tar"
         else
             (cd "$REPO_ROOT" && make rpm)
         fi
