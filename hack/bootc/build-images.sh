@@ -67,7 +67,10 @@ build_rpm() {
                 -w /src \
                 registry.fedoraproject.org/fedora:43 \
                 bash -c '
-                    dnf install -y nodejs npm make rpm-build gettext libappstream-glib git
+                    dnf install -y \
+                        git make rpm-build \
+                        nodejs npm \
+                        gettext libappstream-glib systemd-rpm-macros
                     git config --global --add safe.directory /src
                     make rpm
                 '
