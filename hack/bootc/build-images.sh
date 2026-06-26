@@ -162,7 +162,7 @@ convert_to_raw() {
         "$BIB_IMAGE" \
         build \
         --type raw \
-        --local \
+        --rootfs xfs \
         "localhost/onboarding-${role}:latest"
 
     # BIB writes to /output/image/disk.raw — move to our naming convention
