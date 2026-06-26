@@ -1,0 +1,12 @@
+[Unit]
+Description=Create testadmin user in flightctl PAM issuer
+After=flightctl-pam-issuer.service
+Requires=flightctl-pam-issuer.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/flightctl-setup-admin.sh
+
+[Install]
+WantedBy=flightctl.target

@@ -1,0 +1,43 @@
+FROM quay.io/fedora/fedora-bootc:43
+
+# ---- cached layers (stable dependencies) ----
+
+RUN --mount=type=cache,target=/var/cache/libdnf5 \
+    curl -fsSLo /etc/yum.repos.d/flightctl-fedora.repo https://rpm.flightctl.io/flightctl-fedora.repo \
+    && curl -fsSLo /etc/yum.repos.d/flightctl-dev.repo \
+    https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/fedora-43/group_redhat-et-flightctl-dev-fedora-43.repo \
+    && dnf install -y \
+    flightctl-services-1.2.0 \
+    flightctl-cli
+
+RUN useradd -m -G wheel testadmin \
+    && echo "testadmin:testadmin" | chpasswd \
+    && echo "testadmin ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/testadmin \
+    && chmod 440 /etc/sudoers.d/testadmin \
+    && mkdir -p /home/testadmin/.ssh \
+    && chmod 700 /home/testadmin/.ssh \
+    && chown -R testadmin:testadmin /home/testadmin/.ssh
+
+COPY config/flightctl-setup-admin.sh /usr/local/bin/flightctl-setup-admin.sh
+COPY config/flightctl-setup-admin.service /etc/systemd/system/flightctl-setup-admin.service
+RUN chmod +x /usr/local/bin/flightctl-setup-admin.sh
+
+RUN systemctl enable flightctl.target \
+    && systemctl enable sshd \
+    && systemctl enable flightctl-setup-admin.service
+
+# ---- cache-busting layers (change frequently) ----
+
+RUN mkdir -p /etc/flightctl/pki
+COPY config/pki/ca.crt /etc/flightctl/pki/ca.crt
+COPY config/pki/ca.key /etc/flightctl/pki/ca.key
+RUN chmod 644 /etc/flightctl/pki/ca.crt \
+    && chmod 600 /etc/flightctl/pki/ca.key
+
+COPY config/service-config.yaml /etc/flightctl/service-config.yaml
+
+RUN echo "flightctl.local" > /etc/hostname
+
+RUN mkdir -p /etc/NetworkManager/system-connections
+COPY config/server-ethernet.nmconnection /etc/NetworkManager/system-connections/server-ethernet.nmconnection
+RUN chmod 600 /etc/NetworkManager/system-connections/server-ethernet.nmconnection

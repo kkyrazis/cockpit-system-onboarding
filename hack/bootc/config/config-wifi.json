@@ -1,0 +1,56 @@
+{
+  "version": "1.0",
+  "runOnce": false,
+  "keepCockpit": true,
+  "hideModules": true,
+  "autoReboot": false,
+  "network": {
+    "wifiAp": {
+      "enabled": true,
+      "ssidPrefix": "onboard-",
+      "interface": "",
+      "password": ""
+    },
+    "ethernet": {
+      "enabled": false
+    }
+  },
+  "enrollmentServices": [
+    {
+      "id": "flightctl",
+      "name": "Flight Control",
+      "description": "Enroll this device into Flight Control fleet management",
+      "endpoint": {
+        "url": "https://192.168.1.10:3443",
+        "allowUserOverride": true
+      },
+      "credentialsSchema": {
+        "type": "object",
+        "oneOf": [
+          {
+            "title": "Token",
+            "properties": {
+              "token": { "type": "string", "title": "Token", "format": "password" }
+            },
+            "required": ["token"]
+          },
+          {
+            "title": "Username & password",
+            "properties": {
+              "username": { "type": "string", "title": "Username" },
+              "password": { "type": "string", "title": "Password", "format": "password" }
+            },
+            "required": ["username", "password"]
+          }
+        ]
+      },
+      "scriptPath": "/usr/share/cockpit/system-onboarding/system-onboarding.d/flightctl-enroll.sh"
+    }
+  ],
+  "connectivityTest": {
+    "host": "192.168.1.10"
+  },
+  "led": {
+    "enabled": false
+  }
+}

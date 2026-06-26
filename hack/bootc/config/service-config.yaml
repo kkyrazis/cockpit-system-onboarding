@@ -1,0 +1,25 @@
+global:
+  baseDomain: flightctl.local
+  generateCertificates: builtin
+
+  auth:
+    type: pamOidcIssuer
+    pamOidcIssuer:
+      enabled: true
+      clientId: flightctl-client
+
+  ui:
+    trustXForwardedHeaders: true
+
+db:
+  name: flightctl
+  type: "builtin"
+
+service:
+  rateLimit:
+    enabled: true
+    requests: 300
+    window: 1m
+    authRequests: 20
+    authWindow: 1h
+    trustedProxies: []

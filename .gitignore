@@ -32,6 +32,8 @@
 /tools/
  
 # subdirs (/subdir/...)
+/hack/bootc/config/pki/
+/hack/bootc/output/
 /packaging/arch/PKGBUILD
 /packaging/debian/changelog
 /po/*.pot
