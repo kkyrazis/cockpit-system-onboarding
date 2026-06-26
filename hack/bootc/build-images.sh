@@ -62,18 +62,16 @@ build_rpm() {
         if [[ "$(uname -s)" == "Darwin" ]]; then
             # macOS has no rpmbuild — build inside a Fedora container
             echo "  (building RPM in Fedora container)"
-            mkdir -p "$CACHE_DIR/dnf"
-            podman run --rm \
+            $SUDO_PODMAN build \
+                -t onboarding-builder:latest \
+                -f "$SCRIPT_DIR/Containerfile.builder" \
+                "$SCRIPT_DIR"
+            $SUDO_PODMAN run --rm \
                 --security-opt label=disable \
                 -v "$REPO_ROOT":/src:ro \
                 -v "$REPO_ROOT":/out \
-                -v "$CACHE_DIR/dnf":/var/cache/libdnf5 \
-                registry.fedoraproject.org/fedora:43 \
+                onboarding-builder:latest \
                 bash -c '
-                    dnf install -y \
-                        git make rpm-build \
-                        nodejs npm \
-                        gettext libappstream-glib systemd-rpm-macros
                     cp -a /src /build && cd /build
                     git config --global --add safe.directory /build
                     umask 022
