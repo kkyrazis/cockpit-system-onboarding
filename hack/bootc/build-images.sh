@@ -65,18 +65,20 @@ build_rpm() {
             mkdir -p "$CACHE_DIR/dnf"
             podman run --rm \
                 --security-opt label=disable \
-                -v "$REPO_ROOT":/src \
+                -v "$REPO_ROOT":/src:ro \
+                -v "$REPO_ROOT":/out \
                 -v "$CACHE_DIR/dnf":/var/cache/libdnf5 \
-                -w /src \
                 registry.fedoraproject.org/fedora:43 \
                 bash -c '
                     dnf install -y \
                         git make rpm-build \
                         nodejs npm \
                         gettext libappstream-glib systemd-rpm-macros
-                    git config --global --add safe.directory /src
+                    cp -a /src /build && cd /build
+                    git config --global --add safe.directory /build
                     umask 022
                     make rpm
+                    cp cockpit-system-onboarding-*.noarch.rpm /out/
                 '
         else
             (cd "$REPO_ROOT" && make rpm)
