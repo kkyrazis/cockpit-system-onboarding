@@ -131,7 +131,12 @@ build_containers() {
     for image in "${IMAGES[@]}"; do
         echo ""
         echo "--- Building onboarding-${image} ---"
+        local pull_policy="--pull=newer"
+        if [[ "$image" != "server" ]]; then
+            pull_policy="--pull=never"
+        fi
         $SUDO_PODMAN build \
+            $pull_policy \
             -t "onboarding-${image}:latest" \
             -f "$SCRIPT_DIR/Containerfile.${image}" \
             "$SCRIPT_DIR"
