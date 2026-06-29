@@ -51,7 +51,9 @@ RUN chmod +x /usr/local/bin/flightctl-setup-admin.sh
 
 RUN systemctl enable flightctl.target \
     && systemctl enable sshd \
-    && systemctl enable flightctl-setup-admin.service
+    && systemctl enable flightctl-setup-admin.service \
+    && systemctl mask greenboot-healthcheck.service \
+    && systemctl mask greenboot-reboot.service
 
 # ---- cache-busting layers (change frequently) ----
 
