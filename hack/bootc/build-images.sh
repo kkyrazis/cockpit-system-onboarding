@@ -57,10 +57,20 @@ fi
 build_rpm() {
     local rpm
     rpm=$(find "$REPO_ROOT" -maxdepth 1 -name 'cockpit-system-onboarding-*.noarch.rpm' -print -quit 2>/dev/null)
+
+    # Rebuild if no RPM exists or if any source file is newer than the RPM
+    local needs_build=false
     if [ -z "$rpm" ]; then
-        echo "=== No RPM found, building... ==="
+        needs_build=true
+    elif [ -n "$(find "$REPO_ROOT/src" "$REPO_ROOT/packaging" -newer "$rpm" -print -quit 2>/dev/null)" ]; then
+        echo "=== Source files changed since last RPM build ==="
+        rm -f "$rpm"
+        needs_build=true
+    fi
+
+    if [ "$needs_build" = true ]; then
+        echo "=== Building RPM... ==="
         if [[ "$(uname -s)" == "Darwin" ]]; then
-            # macOS has no rpmbuild — build inside a Fedora container
             echo "  (building RPM in Fedora container)"
             $SUDO_PODMAN build \
                 -t onboarding-builder:latest \
@@ -88,6 +98,7 @@ build_rpm() {
         exit 1
     fi
     echo "=== Using RPM: $(basename "$rpm") ==="
+    rm -f "$SCRIPT_DIR"/cockpit-system-onboarding-*.noarch.rpm
     cp "$rpm" "$SCRIPT_DIR/"
     RPM_FILE="$SCRIPT_DIR/$(basename "$rpm")"
 }
