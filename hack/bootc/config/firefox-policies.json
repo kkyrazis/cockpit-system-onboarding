@@ -1,0 +1,10 @@
+{
+  "policies": {
+    "Certificates": {
+      "Install": ["/etc/cockpit/ws-certs.d/0-self-signed.cert"]
+    },
+    "OverrideFirstRunPage": "",
+    "DisableTelemetry": true,
+    "DontCheckDefaultBrowser": true
+  }
+}

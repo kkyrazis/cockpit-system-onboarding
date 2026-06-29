@@ -10,8 +10,10 @@ ConditionPathExists=/dev/tty0
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/cage -- /usr/bin/firefox --kiosk https://localhost:9090
+ExecStartPre=+/usr/bin/chvt 7
+ExecStart=/usr/libexec/cage-kiosk-start
 Restart=on-failure
+RestartSec=5
 User=kiosk
 Environment=MOZ_ENABLE_WAYLAND=1
 Environment=WLR_LIBINPUT_NO_DEVICES=1
@@ -22,6 +24,7 @@ TTYReset=yes
 TTYVHangup=yes
 TTYVTDisallocate=yes
 StandardInput=tty-fail
+StandardError=journal
 PAMName=cage
 
 [Install]

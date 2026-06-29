@@ -17,8 +17,12 @@ RUN --mount=type=cache,target=/var/cache/libdnf5 \
 
 RUN systemctl enable cockpit-system-onboarding-setup.service
 
+COPY config/firefox-policies.json /usr/lib64/firefox/distribution/policies.json
 COPY config/cage-kiosk@.service /etc/systemd/system/cage-kiosk@.service
+COPY config/cage-kiosk-start.sh /usr/libexec/cage-kiosk-start
+RUN chmod +x /usr/libexec/cage-kiosk-start
 COPY config/cage-pam /etc/pam.d/cage
-RUN useradd -m -s /bin/bash kiosk \
+RUN groupadd -f video \
+    && useradd -m -s /bin/bash -G video kiosk \
     && systemctl enable cage-kiosk@tty7.service \
     && systemctl set-default graphical.target
