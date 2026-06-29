@@ -1,0 +1,29 @@
+[Unit]
+Description=Cage Wayland kiosk on %I
+After=systemd-user-sessions.service plymouth-quit-wait.service
+After=dbus.socket systemd-logind.service
+Before=graphical.target
+Wants=dbus.socket systemd-logind.service
+Conflicts=getty@%i.service
+After=getty@%i.service
+ConditionPathExists=/dev/tty0
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/cage -- /usr/bin/firefox --kiosk https://localhost:9090
+Restart=on-failure
+User=kiosk
+Environment=MOZ_ENABLE_WAYLAND=1
+Environment=WLR_LIBINPUT_NO_DEVICES=1
+UtmpIdentifier=%I
+UtmpMode=user
+TTYPath=/dev/%I
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+PAMName=cage
+
+[Install]
+WantedBy=graphical.target
+DefaultInstance=tty7

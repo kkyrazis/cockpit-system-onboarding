@@ -2,6 +2,9 @@
 camera_auto_detect=0
 display_auto_detect=1
 dtoverlay=vc4-kms-v3d
+max_framebuffers=2
+disable_fw_kms_setup=1
+gpu_mem=128
 arm_boost=1
 disable_overscan=1
 

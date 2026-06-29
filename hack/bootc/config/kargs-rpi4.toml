@@ -1,0 +1,2 @@
+kargs = ["cma=256M"]
+match-architectures = ["aarch64"]

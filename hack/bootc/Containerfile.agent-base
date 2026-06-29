@@ -16,6 +16,7 @@ COPY bootupctl-shim /usr/bin/bootupctl
 RUN chmod +x /usr/bin/bootupctl && \
     chcon --reference=/usr/bin/bootupctl-orig/bootupctl /usr/bin/bootupctl
 COPY config/rpi4-config.txt /boot/efi/config.txt
+COPY config/kargs-rpi4.toml /usr/lib/bootc/kargs.d/01-rpi4.toml
 
 # The bootupctl shim is a bash script running in the bootupd_t SELinux domain,
 # which triggers denials that the original compiled binary does not. Make the
