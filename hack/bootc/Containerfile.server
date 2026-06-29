@@ -15,8 +15,17 @@ RUN dnf install -y bcm2711-firmware uboot-images-armv8 && \
     dnf clean all
 
 COPY bootupctl-shim /usr/bin/bootupctl
-RUN chmod +x /usr/bin/bootupctl
+RUN chmod +x /usr/bin/bootupctl && \
+    chcon --reference=/usr/bin/bootupctl-orig/bootupctl /usr/bin/bootupctl
 COPY config/rpi4-config.txt /boot/efi/config.txt
+
+# The bootupctl shim is a bash script running in the bootupd_t SELinux domain,
+# which triggers denials that the original compiled binary does not. Make the
+# domain permissive until upstream bootupd gains native Pi support.
+RUN dnf install -y policycoreutils-python-utils && \
+    semanage permissive -a bootupd_t && \
+    dnf remove -y policycoreutils-python-utils && \
+    dnf clean all
 
 # ---- cached layers (stable dependencies) ----
 
