@@ -11,11 +11,12 @@
 #   - cockpit-system-onboarding RPM built (run `make rpm` first, or let this script do it)
 #
 # Usage:
-#   hack/bootc/build-images.sh [--containers-only] [--platform generic]
+#   hack/bootc/build-images.sh [--containers-only] [--platform generic] [--only IMAGE,...]
 #
 # Options:
 #   --containers-only   Build container images only (skip disk image conversion).
 #   --platform PLATFORM Target platform: "rpi4" (default) or "generic" (skip Pi firmware).
+#   --only IMAGE,...    Comma-separated list of images to build (e.g. --only server,headful-ethernet).
 #
 # Output:
 #   hack/bootc/output/*.raw  — raw disk images, flash with:
@@ -28,22 +29,40 @@ OUTPUT_DIR="$SCRIPT_DIR/output"
 CACHE_DIR="${HOME}/.cache/bootc-image-builder"
 CONTAINERS_ONLY=false
 PLATFORM=rpi4
+ONLY=""
 BIB_IMAGE="quay.io/centos-bootc/bootc-image-builder:latest"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --containers-only) CONTAINERS_ONLY=true; shift ;;
         --platform) PLATFORM="$2"; shift 2 ;;
+        --only) ONLY="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
 
-IMAGES=(
+ALL_IMAGES=(
     "server"
     "headless-wifi"
     "headless-ethernet"
     "headful-ethernet"
 )
+
+if [[ -n "$ONLY" ]]; then
+    IFS=',' read -ra IMAGES <<< "$ONLY"
+    for img in "${IMAGES[@]}"; do
+        found=false
+        for valid in "${ALL_IMAGES[@]}"; do
+            if [[ "$img" == "$valid" ]]; then found=true; break; fi
+        done
+        if [[ "$found" == false ]]; then
+            echo "ERROR: Unknown image '$img'. Valid: ${ALL_IMAGES[*]}" >&2
+            exit 1
+        fi
+    done
+else
+    IMAGES=("${ALL_IMAGES[@]}")
+fi
 
 # On macOS, podman runs through a VM and doesn't need sudo.
 # On Linux, BIB needs root for privileged container operations.
@@ -133,13 +152,20 @@ generate_ca() {
 # ---------------------------------------------------------------------------
 
 build_containers() {
-    echo ""
-    echo "=== Building agent base image (PLATFORM=$PLATFORM) ==="
-    $SUDO_PODMAN build \
-        --build-arg "PLATFORM=$PLATFORM" \
-        -t "onboarding-agent-base:latest" \
-        -f "$SCRIPT_DIR/Containerfile.agent-base" \
-        "$SCRIPT_DIR"
+    local needs_base=false
+    for image in "${IMAGES[@]}"; do
+        if [[ "$image" != "server" ]]; then needs_base=true; break; fi
+    done
+
+    if [[ "$needs_base" == true ]]; then
+        echo ""
+        echo "=== Building agent base image (PLATFORM=$PLATFORM) ==="
+        $SUDO_PODMAN build \
+            --build-arg "PLATFORM=$PLATFORM" \
+            -t "onboarding-agent-base:latest" \
+            -f "$SCRIPT_DIR/Containerfile.agent-base" \
+            "$SCRIPT_DIR"
+    fi
 
     echo ""
     echo "=== Building role images ==="

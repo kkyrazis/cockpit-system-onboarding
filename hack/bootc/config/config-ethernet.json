@@ -19,7 +19,7 @@
       "name": "Flight Control",
       "description": "Enroll this device into Flight Control fleet management",
       "endpoint": {
-        "url": "https://192.168.1.10:3443",
+        "url": "https://192.168.8.10:3443",
         "allowUserOverride": true
       },
       "credentialsSchema": {
@@ -46,7 +46,7 @@
     }
   ],
   "connectivityTest": {
-    "host": "192.168.1.10"
+    "host": "192.168.8.10"
   },
   "led": {
     "enabled": false
