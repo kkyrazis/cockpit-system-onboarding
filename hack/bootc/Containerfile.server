@@ -74,7 +74,7 @@ RUN chmod 644 /etc/flightctl/pki/ca.crt \
 
 COPY config/service-config.yaml /etc/flightctl/service-config.yaml
 
-RUN echo "flightctl.local" > /etc/hostname
+RUN echo "flightctl.internal" > /etc/hostname
 
 RUN mkdir -p /etc/NetworkManager/system-connections
 COPY config/server-ethernet.nmconnection /etc/NetworkManager/system-connections/server-ethernet.nmconnection
