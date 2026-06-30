@@ -11,10 +11,11 @@
 #   - cockpit-system-onboarding RPM built (run `make rpm` first, or let this script do it)
 #
 # Usage:
-#   hack/bootc/build-images.sh [--containers-only]
+#   hack/bootc/build-images.sh [--containers-only] [--platform generic]
 #
 # Options:
 #   --containers-only   Build container images only (skip disk image conversion).
+#   --platform PLATFORM Target platform: "rpi4" (default) or "generic" (skip Pi firmware).
 #
 # Output:
 #   hack/bootc/output/*.raw  — raw disk images, flash with:
@@ -26,11 +27,13 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 OUTPUT_DIR="$SCRIPT_DIR/output"
 CACHE_DIR="${HOME}/.cache/bootc-image-builder"
 CONTAINERS_ONLY=false
+PLATFORM=rpi4
 BIB_IMAGE="quay.io/centos-bootc/bootc-image-builder:latest"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --containers-only) CONTAINERS_ONLY=true; shift ;;
+        --platform) PLATFORM="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
@@ -131,8 +134,9 @@ generate_ca() {
 
 build_containers() {
     echo ""
-    echo "=== Building agent base image ==="
+    echo "=== Building agent base image (PLATFORM=$PLATFORM) ==="
     $SUDO_PODMAN build \
+        --build-arg "PLATFORM=$PLATFORM" \
         -t "onboarding-agent-base:latest" \
         -f "$SCRIPT_DIR/Containerfile.agent-base" \
         "$SCRIPT_DIR"
@@ -147,6 +151,7 @@ build_containers() {
             pull_policy="--pull=never"
         fi
         $SUDO_PODMAN build \
+            --build-arg "PLATFORM=$PLATFORM" \
             $pull_policy \
             -t "onboarding-${image}:latest" \
             -f "$SCRIPT_DIR/Containerfile.${image}" \

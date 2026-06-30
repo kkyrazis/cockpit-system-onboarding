@@ -1,32 +1,40 @@
 FROM quay.io/fedora/fedora-bootc:43
 
+ARG PLATFORM=rpi4
+
 # ---- Raspberry Pi 4 firmware ----
 
 # Install, stage to a known directory, then remove the packages.
 # The bootupctl shim copies these files into the ESP at image build time.
 # Workaround for https://github.com/coreos/bootupd/issues/651
-RUN dnf install -y bcm2711-firmware uboot-images-armv8 && \
+RUN if [ "$PLATFORM" = "rpi4" ]; then \
+    dnf install -y bcm2711-firmware uboot-images-armv8 && \
     cp -P /usr/share/uboot/rpi_arm64/u-boot.bin /boot/efi/rpi-u-boot.bin && \
     mkdir -p /usr/lib/bootc-raspi-firmwares && \
     cp -a /boot/efi/. /usr/lib/bootc-raspi-firmwares/ && \
     dnf remove -y bcm2711-firmware uboot-images-armv8 && \
     mkdir /usr/bin/bootupctl-orig && \
     mv /usr/bin/bootupctl /usr/bin/bootupctl-orig/ && \
-    dnf clean all
+    dnf clean all; \
+    fi
 
 COPY bootupctl-shim /usr/bin/bootupctl
-RUN chmod +x /usr/bin/bootupctl && \
-    chcon --reference=/usr/bin/bootupctl-orig/bootupctl /usr/bin/bootupctl
+RUN if [ "$PLATFORM" = "rpi4" ]; then \
+    chmod +x /usr/bin/bootupctl && \
+    chcon --reference=/usr/bin/bootupctl-orig/bootupctl /usr/bin/bootupctl; \
+    fi
 COPY config/rpi4-config.txt /boot/efi/config.txt
 COPY config/kargs-rpi4.toml /usr/lib/bootc/kargs.d/01-rpi4.toml
 
 # The bootupctl shim is a bash script running in the bootupd_t SELinux domain,
 # which triggers denials that the original compiled binary does not. Make the
 # domain permissive until upstream bootupd gains native Pi support.
-RUN dnf install -y policycoreutils-python-utils && \
+RUN if [ "$PLATFORM" = "rpi4" ]; then \
+    dnf install -y policycoreutils-python-utils && \
     semanage permissive -a bootupd_t && \
     dnf remove -y policycoreutils-python-utils && \
-    dnf clean all
+    dnf clean all; \
+    fi
 
 # ---- cached layers (stable dependencies) ----
 
