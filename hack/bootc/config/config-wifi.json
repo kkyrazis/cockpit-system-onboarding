@@ -21,7 +21,7 @@
       "name": "Flight Control",
       "description": "Enroll this device into Flight Control fleet management",
       "endpoint": {
-        "url": "https://192.168.8.10:3443",
+        "url": "https://api.flightctl.internal:3443",
         "allowUserOverride": true
       },
       "credentialsSchema": {
@@ -48,7 +48,7 @@
     }
   ],
   "connectivityTest": {
-    "host": "192.168.8.10"
+    "host": "flightctl.internal"
   },
   "led": {
     "enabled": false

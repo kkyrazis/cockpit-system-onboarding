@@ -1,5 +1,5 @@
 global:
-  baseDomain: flightctl.local
+  baseDomain: flightctl.internal
   generateCertificates: builtin
 
   auth:

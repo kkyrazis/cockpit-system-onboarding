@@ -17,6 +17,7 @@
 #   --containers-only   Build container images only (skip disk image conversion).
 #   --platform PLATFORM Target platform: "rpi4" (default) or "generic" (skip Pi firmware).
 #   --only IMAGE,...    Comma-separated list of images to build (e.g. --only server,headful-ethernet).
+#   --new-certs         Regenerate the CA certificate and key before building.
 #
 # Output:
 #   hack/bootc/output/*.raw  — raw disk images, flash with:
@@ -30,6 +31,7 @@ CACHE_DIR="${HOME}/.cache/bootc-image-builder"
 CONTAINERS_ONLY=false
 PLATFORM=rpi4
 ONLY=""
+NEW_CERTS=false
 BIB_IMAGE="quay.io/centos-bootc/bootc-image-builder:latest"
 
 while [[ $# -gt 0 ]]; do
@@ -37,6 +39,7 @@ while [[ $# -gt 0 ]]; do
         --containers-only) CONTAINERS_ONLY=true; shift ;;
         --platform) PLATFORM="$2"; shift 2 ;;
         --only) ONLY="$2"; shift 2 ;;
+        --new-certs) NEW_CERTS=true; shift ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
@@ -128,7 +131,11 @@ build_rpm() {
 generate_ca() {
     local pki_dir="$SCRIPT_DIR/config/pki"
     mkdir -p "$pki_dir"
-    if [ -f "$pki_dir/ca.crt" ] && [ -f "$pki_dir/ca.key" ]; then
+    if [ "$NEW_CERTS" = true ]; then
+        echo ""
+        echo "=== Removing existing CA (--new-certs) ==="
+        rm -f "$pki_dir/ca.crt" "$pki_dir/ca.key"
+    elif [ -f "$pki_dir/ca.crt" ] && [ -f "$pki_dir/ca.key" ]; then
         echo ""
         echo "=== Reusing existing CA at config/pki/ ==="
         return
