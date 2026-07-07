@@ -44,6 +44,8 @@ if [ -n "${1:-}" ] && [ -f "$1" ]; then
     ENROLLMENT_PROXY_USERNAME=$(jq -r '.ENROLLMENT_PROXY_USERNAME // empty' "$1")
     ENROLLMENT_PROXY_PASSWORD=$(jq -r '.ENROLLMENT_PROXY_PASSWORD // empty' "$1")
     ENROLLMENT_PROXY_NO_PROXY=$(jq -r '.ENROLLMENT_PROXY_NO_PROXY // empty' "$1")
+    ENROLLMENT_TLS_MODE=$(jq -r '.ENROLLMENT_TLS_MODE // "system"' "$1")
+    ENROLLMENT_CA_CERT_PEM=$(jq -r '.ENROLLMENT_CA_CERT_PEM // empty' "$1")
     export ENROLLMENT_SERVICE_ID ENROLLMENT_SERVICE_NAME ENROLLMENT_ENDPOINT
     rm -f "$1"
 fi
@@ -149,10 +151,19 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
     cleanup() { rm -rf "$TMPDIR"; }
     trap cleanup EXIT
 
+    TLS_ARGS=()
+    if [ "${ENROLLMENT_TLS_MODE:-system}" = "insecure" ]; then
+        TLS_ARGS+=("-k")
+    elif [ "${ENROLLMENT_TLS_MODE:-system}" = "customCa" ] && [ -n "${ENROLLMENT_CA_CERT_PEM:-}" ]; then
+        echo "$ENROLLMENT_CA_CERT_PEM" > "$TMPDIR/ca.crt"
+        chmod 600 "$TMPDIR/ca.crt"
+        TLS_ARGS+=("--certificate-authority" "$TMPDIR/ca.crt")
+    fi
+
     # Step 1: Login to management service API
     echo "Logging into ${ENROLLMENT_SERVICE_NAME}..."
     if [ -n "$TOKEN" ]; then
-        if ! output=$(flightctl login "$ENROLLMENT_ENDPOINT" --token "$TOKEN" --config-dir "$TMPDIR" -k 2>&1); then
+        if ! output=$(flightctl login "$ENROLLMENT_ENDPOINT" --token "$TOKEN" --config-dir "$TMPDIR" "${TLS_ARGS[@]}" 2>&1); then
             echo "Error: flightctl login failed (token auth)" >&2
             echo "$output" >&2
             exit 2
@@ -160,7 +171,7 @@ if [ "${ENROLLMENT_USE_EXISTING:-false}" != "true" ]; then
     else
         # Note: -p exposes password in /proc/PID/cmdline; unavoidable with current
         # flightctl CLI. The isolated temp config dir limits exposure window.
-        if ! output=$(flightctl login "$ENROLLMENT_ENDPOINT" -u "$USERNAME" -p "$PASSWORD" --config-dir "$TMPDIR" -k 2>&1); then
+        if ! output=$(flightctl login "$ENROLLMENT_ENDPOINT" -u "$USERNAME" -p "$PASSWORD" --config-dir "$TMPDIR" "${TLS_ARGS[@]}" 2>&1); then
             echo "Error: flightctl login failed (password auth)" >&2
             echo "$output" >&2
             exit 2

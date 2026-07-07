@@ -3,6 +3,7 @@ import type { ServiceEnrollmentConfig } from "./types";
 export const DEFAULT_ENROLLMENT_CONFIG: ServiceEnrollmentConfig = {
     selected: true,
     useExisting: false,
+    tlsMode: "system",
 };
 
 export function patchEnrollment(
@@ -24,6 +25,12 @@ export function serializeEnrollmentForMarker(enrollment: ServiceEnrollmentConfig
     }
     if (enrollment.useExisting !== undefined) {
         marker.useExisting = enrollment.useExisting;
+    }
+    if (enrollment.tlsMode !== undefined) {
+        marker.tlsMode = enrollment.tlsMode;
+    }
+    if (enrollment.caCertPem !== undefined) {
+        marker.caCertPem = enrollment.caCertPem;
     }
 
     return marker;

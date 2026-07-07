@@ -172,11 +172,15 @@ export interface FlightctlPasswordCredentials {
 
 export type FlightctlCredentials = FlightctlTokenCredentials | FlightctlPasswordCredentials;
 
+export type TlsMode = "system" | "customCa" | "insecure";
+
 export interface ServiceEnrollmentConfig {
     selected: boolean;
     endpoint?: string;
     credentials?: FlightctlCredentials;
     useExisting?: boolean;
+    tlsMode?: TlsMode;
+    caCertPem?: string;
 }
 
 export type GenericLabel = { key: string; value: string };

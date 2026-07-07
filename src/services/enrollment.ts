@@ -52,6 +52,8 @@ export function buildEnrollmentParams(model: Model, brandName?: string): Record<
         ENROLLMENT_PROXY_USERNAME: networkProxy.username || "",
         ENROLLMENT_PROXY_PASSWORD: networkProxy.password || "",
         ENROLLMENT_PROXY_NO_PROXY: networkProxy.noProxy || "",
+        ENROLLMENT_TLS_MODE: enrollment.tlsMode || "system",
+        ENROLLMENT_CA_CERT_PEM: enrollment.caCertPem || "",
     };
 }
 

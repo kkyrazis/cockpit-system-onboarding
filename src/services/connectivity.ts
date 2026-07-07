@@ -6,6 +6,8 @@ import {
     type OnStepAction,
     type StepExecutionResult,
 } from "../wizard/enrollment-progress-types";
+import type { TlsMode } from "../types";
+import { createSecureTempFile } from "./spawn-helpers";
 
 const IPV4_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
 const IPV6_RE = /^[0-9a-fA-F:]+$/;
@@ -111,7 +113,9 @@ export async function verifyServiceConnectivity(
     endpoint: string,
     useExisting: boolean,
     signal?: CancellationSignal,
-    onAction?: OnStepAction
+    onAction?: OnStepAction,
+    tlsMode?: TlsMode,
+    caCertPem?: string
 ): Promise<StepExecutionResult> {
     const { emit, getActions } = createActionEmitter(onAction);
 
@@ -164,24 +168,21 @@ export async function verifyServiceConnectivity(
         }
     }
 
+    let caCertFile = "";
     try {
+        const curlArgs = ["curl", "-sf", "--max-time", "10"];
+        const effectiveTlsMode = tlsMode ?? "system";
+        if (effectiveTlsMode === "insecure") {
+            curlArgs.push("-k");
+        } else if (effectiveTlsMode === "customCa" && caCertPem) {
+            caCertFile = await createSecureTempFile(caCertPem, ".ca-cert-");
+            curlArgs.push("--cacert", caCertFile);
+        }
+        curlArgs.push("-o", "/dev/null", "-w", "%{http_code}", `${endpoint}/api/v1/version`);
+
         const connectTitle = `Connecting to ${endpoint}`;
         emit({ id: ENROLLMENT_ACTION_IDS.CONNECT_ENDPOINT, actionTitle: connectTitle, result: "pending" });
-        const curlProc = cockpit.spawn(
-            [
-                "curl",
-                "-sf",
-                "--max-time",
-                "10",
-                "-k",
-                "-o",
-                "/dev/null",
-                "-w",
-                "%{http_code}",
-                `${endpoint}/api/v1/version`,
-            ],
-            { err: "ignore" }
-        );
+        const curlProc = cockpit.spawn(curlArgs, { err: "ignore" });
         if (signal) {
             signal.process = curlProc;
         }
@@ -199,5 +200,9 @@ export async function verifyServiceConnectivity(
         const msg = `Cannot connect to ${endpoint}. The server may be unreachable.`;
         emit({ id: ENROLLMENT_ACTION_IDS.CONNECT_ENDPOINT, actionTitle: msg, result: "error" });
         return { success: false, actions: getActions() };
+    } finally {
+        if (caCertFile) {
+            cockpit.spawn(["rm", "-f", caCertFile], { err: "message" }).catch(() => {});
+        }
     }
 }

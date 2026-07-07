@@ -152,6 +152,27 @@ const EnrollmentCardBody = ({
                 <DescriptionListTerm>{cockpit.format(_("$0 server"), brandName)}</DescriptionListTerm>
                 <DescriptionListDescription>{enrollmentEndpoint}</DescriptionListDescription>
             </DescriptionListGroup>
+            {hasNewCredentials && (
+                <DescriptionListGroup>
+                    <DescriptionListTerm>{_("TLS verification")}</DescriptionListTerm>
+                    <DescriptionListDescription>
+                        {enrollment.tlsMode === "insecure"
+                            ? (
+                                <Flex alignItems={{ default: "alignItemsCenter" }} spaceItems={{ default: "spaceItemsSm" }}>
+                                    <FlexItem>
+                                        <Icon status="warning">
+                                            <ExclamationTriangleIcon />
+                                        </Icon>
+                                    </FlexItem>
+                                    <FlexItem>{_("Skip verification (insecure)")}</FlexItem>
+                                </Flex>
+                            )
+                            : enrollment.tlsMode === "customCa"
+                                ? _("Custom CA certificate")
+                                : _("System default")}
+                    </DescriptionListDescription>
+                </DescriptionListGroup>
+            )}
         </>
     );
 };
