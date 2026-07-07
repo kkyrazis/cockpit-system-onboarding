@@ -11,6 +11,7 @@ import {
     ENROLLMENT_ACTION_IDS,
     makeStepAction,
     type OnStepAction,
+    type StepAction,
     type StepExecutionResult,
 } from "../wizard/enrollment-progress-types";
 
@@ -68,17 +69,46 @@ export async function executeEnrollmentScript(
     const endpoint = String(params.ENROLLMENT_ENDPOINT || "");
     const { emit, getActions } = createActionEmitter(onAction);
 
+    let streamLineIndex = 0;
+    let streamBuffer = "";
+    let currentStepAction: StepAction | undefined;
+
+    const processLine = (line: string) => {
+        if (line.startsWith("STEP:")) {
+            currentStepAction = {
+                id: `enrollment-stream-${streamLineIndex++}`,
+                actionTitle: line.slice(5).trim(),
+                result: "pending",
+            };
+            emit(currentStepAction);
+        } else if (line.startsWith("OK:")) {
+            const title = line.slice(3).trim();
+            if (currentStepAction) {
+                emit({ ...currentStepAction, actionTitle: title, result: "success" });
+                currentStepAction = undefined;
+            } else {
+                emit({ id: `enrollment-stream-${streamLineIndex++}`, actionTitle: title, result: "success" });
+            }
+        } else if (line.startsWith("ERROR:")) {
+            const title = line.slice(6).trim();
+            if (currentStepAction) {
+                emit({ ...currentStepAction, actionTitle: title, result: "error" });
+                currentStepAction = undefined;
+            } else {
+                emit({ id: `enrollment-stream-${streamLineIndex++}`, actionTitle: title, result: "error" });
+            }
+        } else if (line.startsWith("INFO:")) {
+            emit({ id: `enrollment-stream-${streamLineIndex++}`, actionTitle: line.slice(5).trim(), result: "info" });
+        }
+    };
+
+    const flushStreamBuffer = () => {
+        const trailing = streamBuffer.trim();
+        if (trailing) processLine(trailing);
+        streamBuffer = "";
+    };
+
     try {
-        console.log(`Executing enrollment script: ${scriptPath}`);
-        console.log("Service:", serviceName, `(${serviceId})`);
-        console.log("Endpoint:", endpoint);
-
-        emit({
-            id: ENROLLMENT_ACTION_IDS.ENROLLMENT_SCRIPT,
-            actionTitle: `Executing enrollment script for ${serviceName}`,
-            result: "pending",
-        });
-
         paramsFile = await createSecureTempFile(JSON.stringify(params), `.enrollment-${serviceId}-`);
 
         const proc = cockpit.spawn(["sudo", scriptPath, paramsFile], {
@@ -88,12 +118,14 @@ export async function executeEnrollmentScript(
             signal.process = proc;
         }
 
-        let streamLineIndex = 0;
         proc.stream((data) => {
             capturedOutput += data;
-            const line = data.trim();
-            if (line) {
-                emit({ id: `enrollment-stream-${streamLineIndex++}`, actionTitle: line, result: "pending" });
+            streamBuffer += data;
+            const parts = streamBuffer.split("\n");
+            streamBuffer = parts.pop() ?? "";
+            for (const part of parts) {
+                const line = part.trim();
+                if (line) processLine(line);
             }
         });
 
@@ -101,19 +133,12 @@ export async function executeEnrollmentScript(
         if (signal) {
             signal.process = undefined;
         }
-        console.log(`Script ${scriptPath} completed successfully`);
-
-        emit({
-            id: ENROLLMENT_ACTION_IDS.ENROLLMENT_SCRIPT,
-            actionTitle: `Executing enrollment script for ${serviceName}`,
-            result: "success",
-        });
+        flushStreamBuffer();
 
         const deviceUrlMatch = capturedOutput.match(/^DEVICE_URL:\s*(.+)$/m);
         if (deviceUrlMatch) {
             const url = deviceUrlMatch[1].trim();
             if (url.startsWith("http://") || url.startsWith("https://")) {
-                console.log(`Parsed device URL: ${url}`);
                 return {
                     success: true,
                     actions: getActions(),
@@ -127,26 +152,25 @@ export async function executeEnrollmentScript(
         if (signal) {
             signal.process = undefined;
         }
-        console.error(`Script ${scriptPath} failed:`, error);
+        flushStreamBuffer();
 
-        let errorMsg = "";
-        let friendlyMsg = "";
-
-        if (capturedOutput.trim()) {
-            errorMsg = capturedOutput.trim();
+        if (currentStepAction) {
+            emit({ ...currentStepAction, result: "error" });
+            currentStepAction = undefined;
         }
 
-        if (error instanceof cockpit.ProcessError && error.exit_status !== null) {
-            const exitCode = error.exit_status;
-            friendlyMsg = getExitCodeMessage(exitCode, endpoint) || "";
-
-            const statusMsg = `Script exited with status ${exitCode}`;
-            errorMsg = errorMsg ? `${errorMsg}\n${statusMsg}` : statusMsg;
+        const hasErrorAction = getActions().some((a) => a.result === "error");
+        if (!hasErrorAction) {
+            let friendlyMsg = "";
+            if (error instanceof cockpit.ProcessError && error.exit_status !== null) {
+                friendlyMsg = getExitCodeMessage(error.exit_status, endpoint) || "";
+            }
+            emit({
+                id: `enrollment-stream-${streamLineIndex++}`,
+                actionTitle: friendlyMsg || "Enrollment script failed",
+                result: "error",
+            });
         }
-
-        const fullMsg = friendlyMsg ? `${friendlyMsg}\n\n${errorMsg}` : errorMsg || "Script failed with unknown error";
-
-        emit({ id: ENROLLMENT_ACTION_IDS.ENROLLMENT_SCRIPT, actionTitle: fullMsg, result: "error" });
         return { success: false, actions: getActions() };
     } finally {
         if (paramsFile) {

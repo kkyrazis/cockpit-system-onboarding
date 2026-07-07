@@ -76,18 +76,14 @@ interface OnboardingCompleteMarker {
 }
 
 const getOnboardingCompleteMessage = (marker: OnboardingCompleteMarker | null): string => {
-    const hostname = marker?.hostname?.trim();
-    if (hostname) {
-        return cockpit.format(
-            _(
-                "System onboarding has already been completed on this device. Open Cockpit at https://$0:9090 with a system account. The temporary onboarding account is no longer available."
-            ),
-            hostname
-        );
+    const completedAt = marker?.completedAt?.trim();
+    if (completedAt) {
+        const date = new Date(completedAt);
+        if (!isNaN(date.getTime())) {
+            return cockpit.format(_("System onboarding was completed on $0."), date.toLocaleString());
+        }
     }
-    return _(
-        "System onboarding has already been completed on this device. Open Cockpit at https://<hostname>:9090 with a system account. The temporary onboarding account is no longer available."
-    );
+    return _("System onboarding has already been completed on this device.");
 };
 
 // Configuration context to provide loaded configuration throughout the app
