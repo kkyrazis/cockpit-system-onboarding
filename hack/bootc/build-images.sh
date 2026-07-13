@@ -16,9 +16,7 @@
 # Options:
 #   --containers-only   Build container images only (skip disk image conversion).
 #   --platform PLATFORM Target platform: "rpi4" (default) or "generic" (skip Pi firmware).
-#   --only IMAGE,...    Comma-separated list of images to build (e.g. --only server,headful-ethernet).
-#   --new-certs         Regenerate the CA certificate and key before building.
-#   --registry-mirror REGISTRY  Mirror for quay.io/flightctl (e.g. quay.io/kkyrazis).
+#   --only IMAGE,...    Comma-separated list of images to build (e.g. --only headful-ethernet).
 #
 # Output:
 #   hack/bootc/output/*.raw  — raw disk images, flash with:
@@ -32,8 +30,6 @@ CACHE_DIR="${HOME}/.cache/bootc-image-builder"
 CONTAINERS_ONLY=false
 PLATFORM=rpi4
 ONLY=""
-NEW_CERTS=false
-REGISTRY_MIRROR=""
 BIB_IMAGE="quay.io/centos-bootc/bootc-image-builder:latest"
 
 while [[ $# -gt 0 ]]; do
@@ -41,14 +37,11 @@ while [[ $# -gt 0 ]]; do
         --containers-only) CONTAINERS_ONLY=true; shift ;;
         --platform) PLATFORM="$2"; shift 2 ;;
         --only) ONLY="$2"; shift 2 ;;
-        --new-certs) NEW_CERTS=true; shift ;;
-        --registry-mirror) REGISTRY_MIRROR="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
 
 ALL_IMAGES=(
-    "server"
     "headless-wifi"
     "headless-ethernet"
     "headful-ethernet"
@@ -79,7 +72,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# RPM + CA
+# RPM
 # ---------------------------------------------------------------------------
 
 build_rpm() {
@@ -131,69 +124,27 @@ build_rpm() {
     RPM_FILE="$SCRIPT_DIR/$(basename "$rpm")"
 }
 
-generate_ca() {
-    local pki_dir="$SCRIPT_DIR/config/pki"
-    mkdir -p "$pki_dir"
-    if [ "$NEW_CERTS" = true ]; then
-        echo ""
-        echo "=== Removing existing CA (--new-certs) ==="
-        rm -f "$pki_dir/ca.crt" "$pki_dir/ca.key"
-    elif [ -f "$pki_dir/ca.crt" ] && [ -f "$pki_dir/ca.key" ]; then
-        echo ""
-        echo "=== Reusing existing CA at config/pki/ ==="
-        return
-    fi
-    echo ""
-    echo "=== Generating root CA (ECDSA P-256, 10yr) ==="
-    openssl ecparam -name prime256v1 -genkey -noout -out "$pki_dir/ca.key"
-    chmod 600 "$pki_dir/ca.key"
-    openssl req -new -x509 -sha256 \
-        -key "$pki_dir/ca.key" \
-        -out "$pki_dir/ca.crt" \
-        -days 3650 \
-        -subj "/CN=flightctl-test-ca" \
-        -addext "basicConstraints = critical, CA:TRUE" \
-        -addext "keyUsage = critical, digitalSignature, keyCertSign, cRLSign"
-    echo "  Generated: config/pki/ca.crt + ca.key"
-}
-
 # ---------------------------------------------------------------------------
 # Container builds
 # ---------------------------------------------------------------------------
 
 build_containers() {
-    local needs_base=false
-    for image in "${IMAGES[@]}"; do
-        if [[ "$image" != "server" ]]; then needs_base=true; break; fi
-    done
-
-    if [[ "$needs_base" == true ]]; then
-        echo ""
-        echo "=== Building agent base image (PLATFORM=$PLATFORM) ==="
-        $SUDO_PODMAN build \
-            --build-arg "PLATFORM=$PLATFORM" \
-            -t "onboarding-agent-base:latest" \
-            -f "$SCRIPT_DIR/Containerfile.agent-base" \
-            "$SCRIPT_DIR"
-    fi
+    echo ""
+    echo "=== Building agent base image (PLATFORM=$PLATFORM) ==="
+    $SUDO_PODMAN build \
+        --build-arg "PLATFORM=$PLATFORM" \
+        -t "onboarding-agent-base:latest" \
+        -f "$SCRIPT_DIR/Containerfile.agent-base" \
+        "$SCRIPT_DIR"
 
     echo ""
     echo "=== Building role images ==="
     for image in "${IMAGES[@]}"; do
         echo ""
         echo "--- Building onboarding-${image} ---"
-        local pull_policy="--pull=newer"
-        if [[ "$image" != "server" ]]; then
-            pull_policy="--pull=never"
-        fi
-        local extra_args=()
-        if [[ "$image" == "server" && -n "$REGISTRY_MIRROR" ]]; then
-            extra_args+=(--build-arg "REGISTRY_MIRROR=$REGISTRY_MIRROR")
-        fi
         $SUDO_PODMAN build \
             --build-arg "PLATFORM=$PLATFORM" \
-            "${extra_args[@]}" \
-            $pull_policy \
+            --pull=never \
             -t "onboarding-${image}:latest" \
             -f "$SCRIPT_DIR/Containerfile.${image}" \
             "$SCRIPT_DIR"
@@ -259,8 +210,6 @@ convert_to_raw() {
 
 main() {
     build_rpm
-    generate_ca
-
     build_containers
 
     if [ "$CONTAINERS_ONLY" = true ]; then
