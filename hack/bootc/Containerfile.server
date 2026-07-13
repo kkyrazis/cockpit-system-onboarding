@@ -46,6 +46,9 @@ RUN --mount=type=cache,target=/var/cache/libdnf5 \
     flightctl-services \
     flightctl-cli
 
+RUN grep -q "^root:" /etc/subuid 2>/dev/null || echo "root:100000:65536" >> /etc/subuid \
+    && grep -q "^root:" /etc/subgid 2>/dev/null || echo "root:100000:65536" >> /etc/subgid
+
 COPY config/preload-quadlet-images.sh /tmp/preload-quadlet-images.sh
 RUN /tmp/preload-quadlet-images.sh && rm -f /tmp/preload-quadlet-images.sh
 
