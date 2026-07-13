@@ -1,6 +1,7 @@
 FROM quay.io/fedora/fedora-bootc:43
 
 ARG PLATFORM=rpi4
+ARG REGISTRY_MIRROR=""
 
 # ---- Raspberry Pi 4 firmware ----
 
@@ -43,11 +44,16 @@ RUN --mount=type=cache,target=/var/cache/libdnf5 \
     && curl -fsSLo /etc/yum.repos.d/flightctl-dev.repo \
     https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/fedora-43/group_redhat-et-flightctl-dev-fedora-43.repo \
     && dnf install -y \
-    flightctl-services \
+    flightctl-services-1.3.0~main~301~ga9e93ea2 \
     flightctl-cli
 
 RUN grep -q "^root:" /etc/subuid 2>/dev/null || echo "root:100000:65536" >> /etc/subuid \
     && grep -q "^root:" /etc/subgid 2>/dev/null || echo "root:100000:65536" >> /etc/subgid
+
+RUN if [ -n "$REGISTRY_MIRROR" ]; then \
+    printf '[[registry]]\nlocation = "quay.io/flightctl"\n\n[[registry.mirror]]\nlocation = "%s"\n' \
+        "$REGISTRY_MIRROR" > /etc/containers/registries.conf.d/flightctl-mirror.conf; \
+    fi
 
 COPY config/preload-quadlet-images.sh /tmp/preload-quadlet-images.sh
 RUN /tmp/preload-quadlet-images.sh && rm -f /tmp/preload-quadlet-images.sh

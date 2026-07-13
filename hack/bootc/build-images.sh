@@ -18,6 +18,7 @@
 #   --platform PLATFORM Target platform: "rpi4" (default) or "generic" (skip Pi firmware).
 #   --only IMAGE,...    Comma-separated list of images to build (e.g. --only server,headful-ethernet).
 #   --new-certs         Regenerate the CA certificate and key before building.
+#   --registry-mirror REGISTRY  Mirror for quay.io/flightctl (e.g. quay.io/kkyrazis).
 #
 # Output:
 #   hack/bootc/output/*.raw  — raw disk images, flash with:
@@ -32,6 +33,7 @@ CONTAINERS_ONLY=false
 PLATFORM=rpi4
 ONLY=""
 NEW_CERTS=false
+REGISTRY_MIRROR=""
 BIB_IMAGE="quay.io/centos-bootc/bootc-image-builder:latest"
 
 while [[ $# -gt 0 ]]; do
@@ -40,6 +42,7 @@ while [[ $# -gt 0 ]]; do
         --platform) PLATFORM="$2"; shift 2 ;;
         --only) ONLY="$2"; shift 2 ;;
         --new-certs) NEW_CERTS=true; shift ;;
+        --registry-mirror) REGISTRY_MIRROR="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
@@ -183,8 +186,13 @@ build_containers() {
         if [[ "$image" != "server" ]]; then
             pull_policy="--pull=never"
         fi
+        local extra_args=()
+        if [[ "$image" == "server" && -n "$REGISTRY_MIRROR" ]]; then
+            extra_args+=(--build-arg "REGISTRY_MIRROR=$REGISTRY_MIRROR")
+        fi
         $SUDO_PODMAN build \
             --build-arg "PLATFORM=$PLATFORM" \
+            "${extra_args[@]}" \
             $pull_policy \
             -t "onboarding-${image}:latest" \
             -f "$SCRIPT_DIR/Containerfile.${image}" \
