@@ -43,7 +43,7 @@ RUN --mount=type=cache,target=/var/cache/libdnf5 \
     && curl -fsSLo /etc/yum.repos.d/flightctl-dev.repo \
     https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/fedora-43/group_redhat-et-flightctl-dev-fedora-43.repo \
     && dnf install -y \
-    flightctl-services-1.2.0 \
+    flightctl-services \
     flightctl-cli
 
 COPY config/preload-quadlet-images.sh /tmp/preload-quadlet-images.sh

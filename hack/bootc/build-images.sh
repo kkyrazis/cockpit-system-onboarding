@@ -71,6 +71,17 @@ fi
 # On Linux, BIB needs root for privileged container operations.
 if [[ "$(uname -s)" == "Darwin" ]]; then
     SUDO_PODMAN="podman"
+
+    # Ensure the podman machine has subuid/subgid mappings for root.
+    # Without these, bootc-image-builder fails with:
+    #   "no subuid ranges found for user root"
+    MACHINE_NAME=$(podman machine info --format '{{.Host.CurrentMachine}}' 2>/dev/null || echo "")
+    if [[ -n "$MACHINE_NAME" ]]; then
+        podman machine ssh "$MACHINE_NAME" '
+            grep -q "^root:" /etc/subuid 2>/dev/null || echo "root:100000:65536" | sudo tee -a /etc/subuid > /dev/null
+            grep -q "^root:" /etc/subgid 2>/dev/null || echo "root:100000:65536" | sudo tee -a /etc/subgid > /dev/null
+        '
+    fi
 else
     SUDO_PODMAN="sudo podman"
 fi

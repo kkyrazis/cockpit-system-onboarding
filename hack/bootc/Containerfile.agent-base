@@ -53,7 +53,7 @@ RUN --mount=type=cache,target=/var/cache/libdnf5 \
     wireless-regdb \
     linux-firmware \
     openssh-server \
-    flightctl-agent-1.2.0 \
+    flightctl-agent \
     flightctl-cli
 
 RUN useradd -m -G wheel testadmin \
