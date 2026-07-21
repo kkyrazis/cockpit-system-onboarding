@@ -28,6 +28,7 @@ export interface ConnectivityTestConfig {
     host?: string;
     carrierTimeoutSeconds?: number;
     connectivityRetries?: number;
+    required?: boolean;
 }
 
 export interface FlightctlConfig {

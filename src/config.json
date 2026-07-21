@@ -26,7 +26,8 @@
     "defaultEndpoint": ""
   },
   "connectivityTest": {
-    "host": "cockpit-project.org"
+    "host": "cockpit-project.org",
+    "required": true
   },
   "onboardingUser": {
     "password": ""

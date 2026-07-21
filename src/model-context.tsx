@@ -64,6 +64,8 @@ export interface Model {
     detectedServerUrl: string;
     connectivityTestHost: string;
     connectivityTestHostEdited: boolean;
+    connectivityTestRequired: boolean;
+    connectivityTestRequiredEdited: boolean;
     enrollmentProgress: {
         currentStep: number; // 0-3
         stepStates: ("pending" | "running" | "success" | "error")[];
@@ -161,6 +163,8 @@ const initialModel: Model = {
     detectedServerUrl: "",
     connectivityTestHost: "",
     connectivityTestHostEdited: false,
+    connectivityTestRequired: true,
+    connectivityTestRequiredEdited: false,
     enrollmentProgress: {
         currentStep: 0,
         stepStates: ["pending", "pending", "pending", "pending"],
@@ -572,6 +576,7 @@ export const ModelProvider: React.FunctionComponent<{
                     customValue: defaults?.alias?.customValue ?? prev.alias.customValue,
                 },
                 connectivityTestHost: connectivityHost,
+                connectivityTestRequired: config?.connectivityTest?.required ?? true,
             }));
 
             setIsInitialized(true);
@@ -641,6 +646,7 @@ export const ModelProvider: React.FunctionComponent<{
             alias: previousAttempt.alias ?? prev.alias,
             labels: previousAttempt.labels ?? prev.labels,
             connectivityTestHost: previousAttempt.connectivityTestHost ?? prev.connectivityTestHost,
+            connectivityTestRequired: previousAttempt.connectivityTestRequired ?? prev.connectivityTestRequired,
         }));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isInitialized, previousAttempt]);

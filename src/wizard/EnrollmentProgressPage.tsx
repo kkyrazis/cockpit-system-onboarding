@@ -231,10 +231,15 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
                     </Icon>
                 );
             case "failed":
-            case "warning":
                 return (
                     <Icon status="danger" iconSize="md">
                         <ExclamationCircleIcon />
+                    </Icon>
+                );
+            case "warning":
+                return (
+                    <Icon status="warning" iconSize="md">
+                        <ExclamationTriangleIcon />
                     </Icon>
                 );
             case "delegated":
@@ -262,8 +267,9 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             case "success":
                 return cockpit.format(_("Completed: $0"), stepName);
             case "failed":
-            case "warning":
                 return cockpit.format(_("Failed: $0"), stepName);
+            case "warning":
+                return cockpit.format(_("Warning: $0"), stepName);
             case "delegated":
                 return cockpit.format(_("Delegated: $0"), stepName);
             default:
@@ -573,6 +579,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             connectivityTestHost: model.connectivityTestHost,
             carrierTimeoutSeconds: config?.connectivityTest?.carrierTimeoutSeconds ?? 300,
             connectivityRetries: config?.connectivityTest?.connectivityRetries ?? 30,
+            connectivityTestRequired: model.connectivityTestRequired,
         };
         const masterParamsFile = await createSecureTempFile(JSON.stringify(masterParams), ".onboarding-apply-");
         tempFilesToCleanup.push(masterParamsFile);
@@ -694,6 +701,12 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
             if (result.success) {
                 setExpandedStepIds((prev) => (prev.includes(step.id) ? prev : [...prev, step.id]));
                 completedSteps++;
+            } else if (step.id === "test-connectivity" && !model.connectivityTestRequired) {
+                setSteps((prev) =>
+                    prev.map((s) => (s.id === step.id ? { ...s, status: "warning" } : s))
+                );
+                setExpandedStepIds((prev) => (prev.includes(step.id) ? prev : [...prev, step.id]));
+                completedSteps++;
             } else {
                 const hasRollbackItems = Object.keys(rollbackManifestRef.current).length > 0;
                 if (hasRollbackItems) {
@@ -792,7 +805,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
     }, [isApplyAuthorized, steps, hasStarted]);
 
     const overallProgress =
-        steps.length > 0 ? Math.round((steps.filter((s) => s.status === "success").length / steps.length) * 100) : 0;
+        steps.length > 0 ? Math.round((steps.filter((s) => s.status === "success" || s.status === "warning").length / steps.length) * 100) : 0;
     const executionState = model.enrollmentProgress.executionState;
     const resultsByStep = groupResultsByStep(steps, results);
     const activeStepId = getActiveStepId(steps, executionState);

@@ -98,6 +98,7 @@ EFFECTIVE_IFACE=$(jq -r '.effectiveIfaceName // .interfaceName // empty' "$PARAM
 HOSTNAME=$(jq -r '.hostname // empty' "$PARAMS_FILE")
 ORIGINAL_HOSTNAME=$(jq -r '.originalHostname // empty' "$PARAMS_FILE")
 CONNECTIVITY_TEST_HOST=$(jq -r '.connectivityTestHost // empty' "$PARAMS_FILE")
+CONNECTIVITY_REQUIRED=$(jq -r 'if .connectivityTestRequired == false then "false" else "true" end' "$PARAMS_FILE")
 
 validate_iface_name() {
     local name="$1"
@@ -217,8 +218,13 @@ for i in $(seq 1 $CONNECTIVITY_TIMEOUT); do
         break
     fi
     if [ "$i" -eq "$CONNECTIVITY_TIMEOUT" ]; then
-        log "ERROR: Network connectivity not available after $CONNECTIVITY_TIMEOUT attempts"
-        exit 1
+        if [ "$CONNECTIVITY_REQUIRED" = "true" ]; then
+            log "ERROR: Network connectivity not available after $CONNECTIVITY_TIMEOUT attempts"
+            exit 1
+        else
+            log "WARNING: Network connectivity not available after $CONNECTIVITY_TIMEOUT attempts (not required, continuing)"
+            break
+        fi
     fi
     sleep 2
 done

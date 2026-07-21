@@ -12,6 +12,7 @@ import {
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
 import { Button } from "@patternfly/react-core/dist/esm/components/Button/index.js";
 import { Card, CardBody } from "@patternfly/react-core/dist/esm/components/Card/index.js";
+import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { FormGroup } from "@patternfly/react-core/dist/esm/components/Form/index.js";
 import { TextInput } from "@patternfly/react-core/dist/esm/components/TextInput/index.js";
 import { Label } from "@patternfly/react-core/dist/esm/components/Label/Label";
@@ -275,6 +276,19 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
         updateModel("connectivityTestHost", value);
     };
 
+    useEffect(() => {
+        if (model.connectivityTestRequiredEdited) {
+            return;
+        }
+        updateModel("connectivityTestRequired", config?.connectivityTest?.required ?? true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const setConnectivityTestRequired = (checked: boolean) => {
+        updateModel("connectivityTestRequiredEdited", true);
+        updateModel("connectivityTestRequired", checked);
+    };
+
     const isSingleNic = useIsConnectedViaInterface(model.networkInterface.selectedInterface);
 
     const aliasSummary =
@@ -528,37 +542,59 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
                     <StackItem>
                         <Card isCompact>
                             <CardBody>
-                                <FormGroup
-                                    label={_("Connectivity test host")}
-                                    isRequired
-                                >
-                                    <TextInput
-                                        id="review-connectivity-test-host"
-                                        value={model.connectivityTestHost}
-                                        onChange={(_event, value) =>
-                                            setConnectivityTestHost(value)
-                                        }
-                                        isRequired
-                                        validated={
-                                            validateHostnameOrIP(model.connectivityTestHost) === null
-                                                ? "default"
-                                                : "error"
-                                        }
-                                    />
-                                    <FormHelperText
-                                        content={
-                                            validateHostnameOrIP(model.connectivityTestHost) ??
-                                            _(
-                                                "Network connectivity to this host will be verified after applying network changes."
-                                            )
-                                        }
-                                        variant={
-                                            validateHostnameOrIP(model.connectivityTestHost) === null
-                                                ? "default"
-                                                : "error"
-                                        }
-                                    />
-                                </FormGroup>
+                                <Stack hasGutter>
+                                    <StackItem>
+                                        <Title headingLevel="h3" size="md">
+                                            {_("Connectivity test")}
+                                        </Title>
+                                    </StackItem>
+                                    <StackItem>
+                                        <FormGroup
+                                            label={_("Host")}
+                                            isRequired
+                                        >
+                                            <TextInput
+                                                id="review-connectivity-test-host"
+                                                value={model.connectivityTestHost}
+                                                onChange={(_event, value) =>
+                                                    setConnectivityTestHost(value)
+                                                }
+                                                isRequired
+                                                validated={
+                                                    validateHostnameOrIP(model.connectivityTestHost) === null
+                                                        ? "default"
+                                                        : "error"
+                                                }
+                                            />
+                                            <FormHelperText
+                                                content={
+                                                    validateHostnameOrIP(model.connectivityTestHost) ??
+                                                    _(
+                                                        "Network connectivity to this host will be verified after applying network changes."
+                                                    )
+                                                }
+                                                variant={
+                                                    validateHostnameOrIP(model.connectivityTestHost) === null
+                                                        ? "default"
+                                                        : "error"
+                                                }
+                                            />
+                                        </FormGroup>
+                                    </StackItem>
+                                    <StackItem>
+                                        <Checkbox
+                                            id="review-connectivity-test-required"
+                                            label={_("Required")}
+                                            isChecked={model.connectivityTestRequired}
+                                            onChange={(_event, checked) => setConnectivityTestRequired(checked)}
+                                            description={
+                                                model.connectivityTestRequired
+                                                    ? _("Enrollment will stop and changes will be rolled back if the connectivity test fails.")
+                                                    : _("A connectivity test failure will show a warning but enrollment will continue.")
+                                            }
+                                        />
+                                    </StackItem>
+                                </Stack>
                             </CardBody>
                         </Card>
                     </StackItem>

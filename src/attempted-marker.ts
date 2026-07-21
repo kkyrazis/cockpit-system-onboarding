@@ -36,6 +36,7 @@ export interface AttemptedMarkerData {
     alias: Model["alias"];
     labels: Model["labels"];
     connectivityTestHost: string;
+    connectivityTestRequired?: boolean;
 }
 
 function serializeModel(model: Model): AttemptedMarkerData {
@@ -73,6 +74,7 @@ function serializeModel(model: Model): AttemptedMarkerData {
             systemInfoMappings: [...model.labels.systemInfoMappings],
         },
         connectivityTestHost: model.connectivityTestHost,
+        connectivityTestRequired: model.connectivityTestRequired,
     };
 }
 
