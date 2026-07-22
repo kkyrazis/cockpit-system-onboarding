@@ -9,7 +9,7 @@ import { LabelHeading } from "../components/Headings";
 import ValidatedTextInput from "../components/ValidatedTextInput";
 import ValidatedRadioLabel from "../components/ValidatedRadioLabel";
 import { useModelContext } from "../model-context";
-import { validateIP, validateIpv4DnsConfig, validateIpv6DnsConfig } from "../validation";
+import { validateDns, validateIpv4DnsConfig, validateIpv6DnsConfig } from "../validation";
 
 const _ = cockpit.gettext;
 
@@ -43,13 +43,13 @@ export const NetworkAddressDns = ({ version }: { version: IpVersion }) => {
     };
 
     const setPrimaryDns = (primaryDns: string) => {
-        const error = validateIP(primaryDns, !dnsConfig.autoDns);
+        const error = validateDns(primaryDns, version, !dnsConfig.autoDns);
         setValidationErrors((prev) => ({ ...prev, primaryDns: error }));
         updateNestedModel("networkAddress", version, { primaryDns });
     };
 
     const setSecondaryDns = (secondaryDns: string) => {
-        const error = validateIP(secondaryDns, false);
+        const error = validateDns(secondaryDns, version, false);
         setValidationErrors((prev) => ({ ...prev, secondaryDns: error }));
         updateNestedModel("networkAddress", version, { secondaryDns });
     };

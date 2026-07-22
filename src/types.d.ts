@@ -145,6 +145,7 @@ export interface IPv6Config {
     autoDns: boolean;
     primaryDns: string | null;
     secondaryDns: string | null;
+    mayFail: boolean;
 }
 
 export interface NetworkServicesState {

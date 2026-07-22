@@ -180,6 +180,11 @@ else
     echo "firewalld is not active, skipping firewall zone setup"
 fi
 
+# Disable IPv6 on the AP interface to prevent stray link-local addresses.
+# The Ethernet path uses NM's ipv6.method=disabled; here we use sysctl
+# because the interface is not managed by NetworkManager.
+sysctl -w "net.ipv6.conf.${WIFI_INTERFACE}.disable_ipv6=1"
+
 # Enable and start the WiFi AP service for this interface
 systemctl enable "flightctl-onboarding-wifi-ap@${WIFI_INTERFACE}.service" 2>/dev/null || true
 systemctl start "flightctl-onboarding-wifi-ap@${WIFI_INTERFACE}.service"

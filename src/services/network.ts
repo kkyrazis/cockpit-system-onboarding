@@ -3,6 +3,7 @@ import { Interface, NetworkManagerModel } from "../../pkg/networkmanager/interfa
 import { Model } from "../model-context";
 import { ONBOARDING_PROFILE_PREFIX } from "../paths";
 import { waitForProxy, waitForProxyWithTimeout } from "./dbus-helpers";
+import { ipv6ToBytes } from "./network-utils";
 import { WifiSecurity } from "../types.js";
 import {
     indexedActionId,
@@ -24,6 +25,7 @@ function pushNetworkAction(actions: StepAction[], actionTitle: string, result: A
 export interface ConnectionIpSettings {
     method?: string;
     dns?: string[];
+    "may-fail"?: boolean;
 }
 
 interface NmDbusVariant<T = unknown> {
@@ -202,6 +204,24 @@ export async function getDefaultInterface(interfaces: Interface[]): Promise<stri
         console.warn("Failed to get default route:", error);
     }
 
+    try {
+        const result = await cockpit.spawn(["ip", "-6", "route", "show", "default"], { err: "message" });
+        const lines = result.split("\n");
+
+        for (const line of lines) {
+            const match = line.match(/default via .+ dev (\S+)/);
+            if (match) {
+                const interfaceName = match[1];
+                const found = interfaces.find((iface) => iface.Name === interfaceName);
+                if (found) {
+                    return interfaceName;
+                }
+            }
+        }
+    } catch (error) {
+        console.warn("Failed to get default IPv6 route:", error);
+    }
+
     // Fallback: find first active interface
     const activeInterface = interfaces.find(
         (iface) => iface.Device && iface.Device.State === 100 // NM_DEVICE_STATE_ACTIVATED
@@ -210,44 +230,60 @@ export async function getDefaultInterface(interfaces: Interface[]): Promise<stri
     return activeInterface ? activeInterface.Name : null;
 }
 
-const DHCP_HOSTNAME_OPTION = "12";
+const DHCP4_HOSTNAME_KEY = "host_name";
+const DHCP6_FQDN_KEY = "fqdn_fqdn";
 
 export async function getDhcpHostname(interfaces: Interface[]): Promise<string> {
     try {
         const defaultIface = await getDefaultInterface(interfaces);
-        if (!defaultIface) {
-            return "";
-        }
+        if (!defaultIface) return "";
 
         const iface = interfaces.find((i) => i.Name === defaultIface);
-        if (!iface || !iface.Device || !iface.Device.ActiveConnection) {
-            return "";
-        }
+        if (!iface?.Device?.ActiveConnection) return "";
 
         const ipv4Settings = iface.MainConnection?.Settings.ipv4 as ConnectionIpSettings | undefined;
+        const ipv6Settings = iface.MainConnection?.Settings.ipv6 as ConnectionIpSettings | undefined;
         const ipv4Method = ipv4Settings?.method;
-        if (ipv4Method === "manual") {
+        const ipv6Method = ipv6Settings?.method;
+
+        if (ipv4Method === "manual" && (ipv6Method === "manual" || ipv6Method === "ignore" || ipv6Method === "disabled")) {
             return "";
         }
 
-        const activeConnection = iface.Device.ActiveConnection;
-        if (!activeConnection.Ip4Config) {
-            return "";
-        }
-
-        // polkit rule authorizes the onboarding user
         const nmClient = cockpit.dbus("org.freedesktop.NetworkManager");
         try {
-            const ip4ConfigProxy = await waitForProxyWithTimeout<{ DhcpOptions?: Record<string, string> }>(
-                nmClient.proxy(
-                    "org.freedesktop.NetworkManager.IP4Config",
-                    activeConnection.Ip4Config as unknown as string
-                ),
+            const [devicePath] = await nmClient.call(
+                "/org/freedesktop/NetworkManager",
+                "org.freedesktop.NetworkManager",
+                "GetDeviceByIpIface",
+                [defaultIface]
+            );
+
+            const deviceProxy = await waitForProxyWithTimeout(
+                nmClient.proxy("org.freedesktop.NetworkManager.Device", devicePath),
                 2000
             );
 
-            const dhcpOptions = ip4ConfigProxy.data.DhcpOptions || {};
-            return dhcpOptions[DHCP_HOSTNAME_OPTION] || "";
+            if (ipv4Method !== "manual" && deviceProxy.data.Dhcp4Config && deviceProxy.data.Dhcp4Config !== "/") {
+                const dhcp4Proxy = await waitForProxyWithTimeout(
+                    nmClient.proxy("org.freedesktop.NetworkManager.DHCP4Config", deviceProxy.data.Dhcp4Config),
+                    2000
+                );
+                const options = dhcp4Proxy.data.Options || {};
+                if (options[DHCP4_HOSTNAME_KEY]) return options[DHCP4_HOSTNAME_KEY];
+            }
+
+            if (ipv6Method !== "manual" && ipv6Method !== "ignore" && ipv6Method !== "disabled"
+                && deviceProxy.data.Dhcp6Config && deviceProxy.data.Dhcp6Config !== "/") {
+                const dhcp6Proxy = await waitForProxyWithTimeout(
+                    nmClient.proxy("org.freedesktop.NetworkManager.DHCP6Config", deviceProxy.data.Dhcp6Config),
+                    2000
+                );
+                const options = dhcp6Proxy.data.Options || {};
+                if (options[DHCP6_FQDN_KEY]) return options[DHCP6_FQDN_KEY];
+            }
+
+            return "";
         } finally {
             nmClient.close();
         }
@@ -482,6 +518,7 @@ function buildConnectionSettings(
             gateway: { t: "s", v: model.networkAddress.ipv6.gateway || "" },
             dns: { t: "aay", v: dnsBytes },
             "ignore-auto-dns": { t: "b", v: !model.networkAddress.ipv6.autoDns },
+            "may-fail": { t: "b", v: model.networkAddress.ipv6.mayFail },
         };
     } else if (model.networkAddress.ipv6.method === "disabled") {
         settings.ipv6 = {
@@ -490,44 +527,16 @@ function buildConnectionSettings(
     } else if (model.networkAddress.ipv6.method === "dhcp") {
         settings.ipv6 = {
             method: { t: "s", v: "dhcp" },
+            "may-fail": { t: "b", v: model.networkAddress.ipv6.mayFail },
         };
     } else {
         settings.ipv6 = {
             method: { t: "s", v: "auto" },
+            "may-fail": { t: "b", v: model.networkAddress.ipv6.mayFail },
         };
     }
 
     return settings;
-}
-
-function ipv6ToBytes(ip: string): number[] {
-    // Expand :: notation and convert to 16 bytes
-    const parts = ip.split(":");
-    const result: number[] = new Array(16).fill(0);
-
-    // Handle :: expansion
-    const doubleColonIndex = parts.indexOf("");
-    if (doubleColonIndex !== -1) {
-        const before = parts.slice(0, doubleColonIndex).filter((p) => p !== "");
-        const after = parts.slice(doubleColonIndex + 1).filter((p) => p !== "");
-        const missing = 8 - before.length - after.length;
-
-        const expanded = [...before, ...new Array(missing).fill("0"), ...after];
-
-        for (let i = 0; i < 8; i++) {
-            const val = parseInt(expanded[i] || "0", 16);
-            result[i * 2] = (val >> 8) & 0xff;
-            result[i * 2 + 1] = val & 0xff;
-        }
-    } else {
-        for (let i = 0; i < 8; i++) {
-            const val = parseInt(parts[i] || "0", 16);
-            result[i * 2] = (val >> 8) & 0xff;
-            result[i * 2 + 1] = val & 0xff;
-        }
-    }
-
-    return result;
 }
 
 export async function applyNetworkConfiguration(

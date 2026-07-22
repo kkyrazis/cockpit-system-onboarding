@@ -2,6 +2,7 @@ import React from "react";
 import cockpit from "cockpit";
 
 import { Alert } from "@patternfly/react-core/dist/esm/components/Alert/index.js";
+import { Checkbox } from "@patternfly/react-core/dist/esm/components/Checkbox/index.js";
 import { Radio } from "@patternfly/react-core/dist/esm/components/Radio/index.js";
 import { Stack, StackItem } from "@patternfly/react-core/dist/esm/layouts/Stack/index.js";
 import { Title } from "@patternfly/react-core/dist/esm/components/Title/index.js";
@@ -190,6 +191,17 @@ const NetworkConfigIPv6 = ({ hideAvailabilityChecks = false }: { hideAvailabilit
                         </StackItem>
                         <StackItem>
                             <NetworkAddressDns version="ipv6" />
+                        </StackItem>
+                        <StackItem>
+                            <Checkbox
+                                id="ipv6-require-connectivity"
+                                label={_("Require IPv6 connectivity")}
+                                isChecked={!model.networkAddress.ipv6.mayFail}
+                                onChange={(_event, checked) =>
+                                    updateNestedModel("networkAddress", "ipv6", { mayFail: !checked })
+                                }
+                                description={_("When enabled, the connection will fail if IPv6 configuration is unsuccessful.")}
+                            />
                         </StackItem>
                     </Stack>
                 </FeatureSwitch>

@@ -143,6 +143,19 @@ class TestReview(testlib.MachineCase):
         b.wait_in_text(REVIEW_SERVICES, "HTTP proxy")
         b.wait_in_text(REVIEW_SERVICES, "No proxy configured")
 
+    def testReviewDisplaysIPv6Configuration(self):
+        """Test that review page shows IPv6 configuration correctly"""
+        b = self.browser
+
+        self.login_and_go("/system-onboarding", user="onboarding", password="", superuser=False, tls=True)
+
+        advance_past_optional_steps_to_review(b, "ipv6-test-host")
+
+        b.wait_in_text(REVIEW_NETWORK, "IPv6 Connection")
+        b.wait_in_text(REVIEW_NETWORK, "Automatic (SLAAC)")
+        b.wait_in_text(REVIEW_NETWORK, "IPv6 required")
+        b.wait_in_text(REVIEW_NETWORK, "No")
+
     def testReviewDisplaysEnrollmentSkipped(self):
         """Test that review page shows enrollment skipped when not selected"""
         b = self.browser

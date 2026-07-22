@@ -46,6 +46,7 @@ interface NetworkAddressConfig {
         autoDns: boolean;
         primaryDns: string;
         secondaryDns: string;
+        mayFail: boolean;
     };
 }
 
@@ -95,6 +96,7 @@ const defaultNetworkConfig: NetworkAddressConfig = {
         autoDns: true,
         primaryDns: "",
         secondaryDns: "",
+        mayFail: true,
     },
 };
 
@@ -131,6 +133,7 @@ const initialModel: Model = {
             autoDns: true,
             primaryDns: null,
             secondaryDns: null,
+            mayFail: true,
         },
     },
     originalNetworkConfigs: {},
@@ -217,6 +220,7 @@ const stateToConfig = (state: NetworkAddressState): NetworkAddressConfig => {
             autoDns: state.ipv6.autoDns,
             primaryDns: state.ipv6.primaryDns ?? "",
             secondaryDns: state.ipv6.secondaryDns ?? "",
+            mayFail: state.ipv6.mayFail,
         },
     };
 };
@@ -250,6 +254,7 @@ const configToState = (config: NetworkAddressConfig): NetworkAddressState => {
             autoDns: config.ipv6.autoDns,
             primaryDns: config.ipv6.primaryDns || null,
             secondaryDns: config.ipv6.secondaryDns || null,
+            mayFail: config.ipv6.mayFail,
         },
     };
 };
@@ -323,6 +328,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
     const ipv6Settings = iface.MainConnection?.Settings.ipv6 as ConnectionIpSettings | undefined;
     const ipv6Method = ipv6Settings?.method || "dhcp";
     const ipv6ConnectionDns = ipv6Settings?.dns || [];
+    const ipv6MayFail = ipv6Settings?.["may-fail"] ?? true;
 
     if (
         activeConnection.Ip6Config &&
@@ -350,6 +356,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
             autoDns: !hasStaticDns,
             primaryDns: dnsServers[0] || "",
             secondaryDns: dnsServers[1] || "",
+            mayFail: ipv6MayFail,
         };
     } else if (ipv6ConnectionDns.length > 0) {
         // Handle case where there are DNS settings but no active addresses
@@ -366,6 +373,7 @@ const extractNetworkConfig = (iface: Interface): NetworkAddressConfig => {
             autoDns: false,
             primaryDns: ipv6ConnectionDns[0] || "",
             secondaryDns: ipv6ConnectionDns[1] || "",
+            mayFail: ipv6MayFail,
         };
     }
 

@@ -230,11 +230,6 @@ export const validateIPv6Gateway = (gateway: string): string | null => {
         return error;
     }
 
-    // Check if it's a link-local address (not allowed for gateway)
-    if (trimmedGateway.toLowerCase().startsWith("fe80:")) {
-        return "Gateway cannot be a link-local address (fe80::)";
-    }
-
     return null;
 };
 
@@ -342,10 +337,10 @@ export const validateIpv4StaticConfig = (ipv4: IPv4Config): boolean => {
  */
 export const validateIpv4DnsConfig = (ipv4: IPv4Config): boolean => {
     if (!ipv4.autoDns) {
-        if (!ipv4.primaryDns || validateIP(ipv4.primaryDns) !== null) {
+        if (!ipv4.primaryDns || validateIPv4(ipv4.primaryDns) !== null) {
             return false;
         }
-        if (ipv4.secondaryDns && validateIP(ipv4.secondaryDns, false) !== null) {
+        if (ipv4.secondaryDns && validateIPv4(ipv4.secondaryDns) !== null) {
             return false;
         }
     }
@@ -375,10 +370,10 @@ export const validateIpv6StaticConfig = (ipv6: IPv6Config): boolean => {
  */
 export const validateIpv6DnsConfig = (ipv6: IPv6Config): boolean => {
     if (!ipv6.autoDns) {
-        if (!ipv6.primaryDns || validateIP(ipv6.primaryDns) !== null) {
+        if (!ipv6.primaryDns || validateIPv6(ipv6.primaryDns) !== null) {
             return false;
         }
-        if (ipv6.secondaryDns && validateIP(ipv6.secondaryDns, false) !== null) {
+        if (ipv6.secondaryDns && validateIPv6(ipv6.secondaryDns) !== null) {
             return false;
         }
     }
@@ -399,6 +394,12 @@ export const validateIPv6GatewaySubnet = (address: string, gateway: string): str
         return null;
     }
     if (validateIPv6(addr, true) || validateIPv6(gw)) {
+        return null;
+    }
+
+    // Link-local gateways are valid next-hops on the same link regardless of
+    // the static address's prefix, so skip the subnet check.
+    if (gw.toLowerCase().startsWith("fe80:")) {
         return null;
     }
 
@@ -429,6 +430,24 @@ export const validateIPv6GatewaySubnet = (address: string, gateway: string): str
     }
 
     return null;
+};
+
+/**
+ * Validate a DNS server address for a specific IP version.
+ *
+ * IPv4 DNS fields only accept IPv4 addresses; IPv6 DNS fields only accept IPv6.
+ *
+ * @param ip - The DNS server address to validate
+ * @param version - The IP version context ("ipv4" or "ipv6")
+ * @param required - Whether the field is required
+ * @returns Error message or null if valid
+ */
+export const validateDns = (ip: string, version: "ipv4" | "ipv6", required = true): string | null => {
+    const trimmedIp = ip.trim();
+    if (!trimmedIp) {
+        return required ? "DNS server address is required" : null;
+    }
+    return version === "ipv4" ? validateIPv4(trimmedIp) : validateIPv6(trimmedIp);
 };
 
 /**

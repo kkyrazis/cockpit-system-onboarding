@@ -5,7 +5,7 @@
  * IPv4, IPv6, subnet mask, and DNS validation as specified in data-model.md
  */
 
-import { validateIPv4, validateSubnetMask, validateIPv6, validateIPv6Gateway, validateIP } from "../../validation";
+import { validateIPv4, validateSubnetMask, validateIPv6, validateIPv6Gateway, validateIPv6GatewaySubnet, validateIP } from "../../validation";
 
 describe("validateIPv4 - IPv4 Address Validation", () => {
     describe("Required field validation", () => {
@@ -253,11 +253,12 @@ describe("validateIPv6Gateway - IPv6 Gateway Validation", () => {
         });
     });
 
-    describe("Link-local address rejection", () => {
-        test("rejects fe80:: link-local addresses", () => {
-            expect(validateIPv6Gateway("fe80::")).toBe("Gateway cannot be a link-local address (fe80::)");
-            expect(validateIPv6Gateway("fe80::1")).toBe("Gateway cannot be a link-local address (fe80::)");
-            expect(validateIPv6Gateway("FE80::1")).toBe("Gateway cannot be a link-local address (fe80::)");
+    describe("Link-local address acceptance", () => {
+        test("accepts fe80:: link-local addresses as valid gateways", () => {
+            expect(validateIPv6Gateway("fe80::")).toBeNull();
+            expect(validateIPv6Gateway("fe80::1")).toBeNull();
+            expect(validateIPv6Gateway("FE80::1")).toBeNull();
+            expect(validateIPv6Gateway("fe80::1:2:3:4")).toBeNull();
         });
 
         test("accepts non-link-local addresses", () => {
@@ -271,6 +272,72 @@ describe("validateIPv6Gateway - IPv6 Gateway Validation", () => {
             expect(validateIPv6Gateway("not-an-ipv6")).not.toBeNull();
             expect(validateIPv6Gateway("192.168.1.1")).not.toBeNull();
             expect(validateIPv6Gateway("gggg::")).not.toBeNull();
+        });
+    });
+});
+
+describe("validateIPv6GatewaySubnet - IPv6 Gateway Subnet Validation", () => {
+    const SUBNET_ERROR = "Gateway is not in the same subnet as the IPv6 address";
+
+    describe("same subnet (valid)", () => {
+        const validCases: [string, string, string][] = [
+            ["same /64 subnet", "2001:db8::1/64", "2001:db8::2"],
+            ["same /48 subnet", "2001:db8:abcd::1/48", "2001:db8:abcd:ffff::1"],
+            ["/128 exact match", "2001:db8::1/128", "2001:db8::1"],
+            ["same /32 subnet", "2001:db8::1/32", "2001:db8:ffff::1"],
+            ["same /1 subnet (broad)", "8000::1/1", "8000::2"],
+        ];
+
+        test.each(validCases)("%s", (_name, address, gateway) => {
+            expect(validateIPv6GatewaySubnet(address, gateway)).toBeNull();
+        });
+    });
+
+    describe("different subnet (invalid)", () => {
+        const invalidCases: [string, string, string][] = [
+            ["different /64 subnet", "2001:db8:1::1/64", "2001:db8:2::1"],
+            ["different /48 subnet", "2001:db8:abcd::1/48", "2001:db8:abce::1"],
+            ["/128 mismatch", "2001:db8::1/128", "2001:db8::2"],
+        ];
+
+        test.each(invalidCases)("%s", (_name, address, gateway) => {
+            expect(validateIPv6GatewaySubnet(address, gateway)).toBe(SUBNET_ERROR);
+        });
+    });
+
+    describe("fe80:: link-local gateway bypass", () => {
+        const linkLocalCases: [string, string, string][] = [
+            ["fe80:: gateway with global address", "2001:db8::1/64", "fe80::1"],
+            ["fe80:: gateway with different prefix", "fd00::1/48", "fe80::abcd:1234"],
+            ["FE80:: uppercase", "2001:db8::1/64", "FE80::1"],
+        ];
+
+        test.each(linkLocalCases)("%s", (_name, address, gateway) => {
+            expect(validateIPv6GatewaySubnet(address, gateway)).toBeNull();
+        });
+    });
+
+    describe("empty/missing values", () => {
+        const emptyCases: [string, string, string][] = [
+            ["empty gateway", "2001:db8::1/64", ""],
+            ["empty address", "", "2001:db8::1"],
+            ["both empty", "", ""],
+            ["whitespace gateway", "2001:db8::1/64", "   "],
+            ["address without prefix", "2001:db8::1", "2001:db8::2"],
+        ];
+
+        test.each(emptyCases)("%s", (_name, address, gateway) => {
+            expect(validateIPv6GatewaySubnet(address, gateway)).toBeNull();
+        });
+    });
+
+    describe("invalid input format", () => {
+        test("invalid address format returns null (skips check)", () => {
+            expect(validateIPv6GatewaySubnet("not-valid/64", "2001:db8::1")).toBeNull();
+        });
+
+        test("invalid gateway format returns null (skips check)", () => {
+            expect(validateIPv6GatewaySubnet("2001:db8::1/64", "not-valid")).toBeNull();
         });
     });
 });
@@ -329,12 +396,13 @@ describe("Validation integration - Real-world scenarios", () => {
             expect(validateIPv4(gateway)).not.toBeNull();
         });
 
-        test("detects invalid IPv6 gateway (link-local)", () => {
+        test("accepts IPv6 link-local gateway with non-link-local address", () => {
             const address = "2001:db8::1/64";
-            const gateway = "fe80::1"; // Link-local not allowed
+            const gateway = "fe80::1";
 
             expect(validateIPv6(address, true)).toBeNull();
-            expect(validateIPv6Gateway(gateway)).toBe("Gateway cannot be a link-local address (fe80::)");
+            expect(validateIPv6Gateway(gateway)).toBeNull();
+            expect(validateIPv6GatewaySubnet(address, gateway)).toBeNull();
         });
     });
 });

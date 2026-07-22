@@ -424,7 +424,8 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
                             <DescriptionListGroup>
                                 <DescriptionListTerm>{_("IPv6 Connection")}</DescriptionListTerm>
                                 <DescriptionListDescription>
-                                    {model.networkAddress.ipv6.method === "auto" && _("Automatic (DHCP)")}
+                                    {model.networkAddress.ipv6.method === "auto" && _("Automatic (SLAAC)")}
+                                    {model.networkAddress.ipv6.method === "dhcp" && _("Stateful DHCPv6")}
                                     {model.networkAddress.ipv6.method === "static" && _("Static")}
                                     {model.networkAddress.ipv6.method === "disabled" && _("Disabled")}
                                 </DescriptionListDescription>
@@ -465,6 +466,14 @@ export const ReviewPage: React.FunctionComponent<ReviewPageProps> = ({ hasSelect
                                                     )}
                                             </>
                                         )}
+                                    </DescriptionListDescription>
+                                </DescriptionListGroup>
+                            )}
+                            {model.networkAddress.ipv6.method !== "disabled" && (
+                                <DescriptionListGroup>
+                                    <DescriptionListTerm>{_("IPv6 required")}</DescriptionListTerm>
+                                    <DescriptionListDescription>
+                                        {model.networkAddress.ipv6.mayFail ? _("No") : _("Yes")}
                                     </DescriptionListDescription>
                                 </DescriptionListGroup>
                             )}

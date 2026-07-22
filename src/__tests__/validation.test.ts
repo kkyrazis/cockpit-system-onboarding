@@ -1,4 +1,113 @@
-import { validateURL, validateSystemHostname } from "../validation";
+import { IPv4Config, IPv6Config } from "../types";
+import { validateURL, validateSystemHostname, validateDns, validateIpv4DnsConfig, validateIpv6DnsConfig } from "../validation";
+
+describe("validateDns", () => {
+    const validCases: [string, string, "ipv4" | "ipv6"][] = [
+        ["IPv4 address in IPv4 context", "8.8.8.8", "ipv4"],
+        ["IPv4 address in IPv4 context (alt)", "192.168.1.1", "ipv4"],
+        ["IPv6 address in IPv6 context", "2001:4860:4860::8888", "ipv6"],
+        ["IPv6 address in IPv6 context (loopback)", "::1", "ipv6"],
+    ];
+
+    test.each(validCases)("accepts %s", (_name, ip, version) => {
+        expect(validateDns(ip, version)).toBeNull();
+    });
+
+    const rejectedCases: [string, string, "ipv4" | "ipv6"][] = [
+        ["IPv6 address in IPv4 context", "2001:4860:4860::8888", "ipv4"],
+        ["IPv6 loopback in IPv4 context", "::1", "ipv4"],
+        ["IPv4 address in IPv6 context", "8.8.8.8", "ipv6"],
+        ["IPv4 address in IPv6 context (alt)", "192.168.1.1", "ipv6"],
+    ];
+
+    test.each(rejectedCases)("rejects %s", (_name, ip, version) => {
+        expect(validateDns(ip, version)).not.toBeNull();
+    });
+
+    test("returns error when required and empty", () => {
+        expect(validateDns("", "ipv4", true)).toBe("DNS server address is required");
+        expect(validateDns("", "ipv6", true)).toBe("DNS server address is required");
+    });
+
+    test("returns null when optional and empty", () => {
+        expect(validateDns("", "ipv4", false)).toBeNull();
+        expect(validateDns("", "ipv6", false)).toBeNull();
+    });
+});
+
+describe("validateIpv4DnsConfig", () => {
+    const makeIpv4Config = (overrides: Partial<IPv4Config> = {}): IPv4Config => ({
+        method: "static",
+        address: "192.168.1.10",
+        subnetMask: "255.255.255.0",
+        gateway: "192.168.1.1",
+        autoDns: false,
+        primaryDns: null,
+        secondaryDns: null,
+        ...overrides,
+    });
+
+    test("accepts valid IPv4 DNS", () => {
+        expect(validateIpv4DnsConfig(makeIpv4Config({ primaryDns: "8.8.8.8" }))).toBe(true);
+    });
+
+    test("accepts valid IPv4 DNS with secondary", () => {
+        expect(validateIpv4DnsConfig(makeIpv4Config({ primaryDns: "8.8.8.8", secondaryDns: "8.8.4.4" }))).toBe(true);
+    });
+
+    test("rejects IPv6 address as IPv4 DNS", () => {
+        expect(validateIpv4DnsConfig(makeIpv4Config({ primaryDns: "2001:4860:4860::8888" }))).toBe(false);
+    });
+
+    test("rejects IPv6 secondary DNS in IPv4 config", () => {
+        expect(
+            validateIpv4DnsConfig(makeIpv4Config({ primaryDns: "8.8.8.8", secondaryDns: "2001:4860:4860::8844" })),
+        ).toBe(false);
+    });
+
+    test("accepts autoDns without DNS addresses", () => {
+        expect(validateIpv4DnsConfig(makeIpv4Config({ autoDns: true }))).toBe(true);
+    });
+});
+
+describe("validateIpv6DnsConfig", () => {
+    const makeIpv6Config = (overrides: Partial<IPv6Config> = {}): IPv6Config => ({
+        method: "static",
+        address: "2001:db8::1/64",
+        gateway: "2001:db8::ffff",
+        autoDns: false,
+        primaryDns: null,
+        secondaryDns: null,
+        mayFail: true,
+        ...overrides,
+    });
+
+    test("accepts valid IPv6 DNS", () => {
+        expect(validateIpv6DnsConfig(makeIpv6Config({ primaryDns: "2001:4860:4860::8888" }))).toBe(true);
+    });
+
+    test("accepts valid IPv6 DNS with secondary", () => {
+        expect(
+            validateIpv6DnsConfig(
+                makeIpv6Config({ primaryDns: "2001:4860:4860::8888", secondaryDns: "2001:4860:4860::8844" }),
+            ),
+        ).toBe(true);
+    });
+
+    test("rejects IPv4 address as IPv6 DNS", () => {
+        expect(validateIpv6DnsConfig(makeIpv6Config({ primaryDns: "8.8.8.8" }))).toBe(false);
+    });
+
+    test("rejects IPv4 secondary DNS in IPv6 config", () => {
+        expect(
+            validateIpv6DnsConfig(makeIpv6Config({ primaryDns: "2001:4860:4860::8888", secondaryDns: "8.8.4.4" })),
+        ).toBe(false);
+    });
+
+    test("accepts autoDns without DNS addresses", () => {
+        expect(validateIpv6DnsConfig(makeIpv6Config({ autoDns: true }))).toBe(true);
+    });
+});
 
 describe("validateURL", () => {
     test("accepts URL with IPv4 address hostname", () => {

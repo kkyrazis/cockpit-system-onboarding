@@ -212,8 +212,8 @@ class TestIPConfiguration(testlib.MachineCase):
 
         b.set_input_text("#ipv6-address", "2001:db8::1/64")
 
-    def testIPv6GatewayValidation(self):
-        """Test that IPv6 gateway rejects link-local addresses"""
+    def testIPv6GatewayLinkLocal(self):
+        """Test that IPv6 gateway accepts link-local and global addresses"""
         b = self.browser
 
         b.wait_visible("#ipv6-method:checked")
@@ -224,9 +224,11 @@ class TestIPConfiguration(testlib.MachineCase):
 
         b.set_input_text("#gateway-ipv6", "fe80::1")
         b.focus("#ipv6-address")
-        b.wait_in_text("#gateway-ipv6-helper-error", "Gateway cannot be a link-local address")
+        b.wait_not_present("#gateway-ipv6-helper-error")
 
         b.set_input_text("#gateway-ipv6", "2001:db8::ffff")
+        b.focus("#ipv6-address")
+        b.wait_not_present("#gateway-ipv6-helper-error")
 
     def testIPv4DisableEnable(self):
         """Test disabling and re-enabling IPv4 via FeatureSwitch"""
@@ -268,6 +270,72 @@ class TestIPConfiguration(testlib.MachineCase):
         self.assertEqual(b.val("#ipv4-address"), "192.168.1.100")
         self.assertEqual(b.val("#subnet-mask"), "255.255.255.0")
         self.assertEqual(b.val("#gateway-ip"), "192.168.1.1")
+
+    def testIPv6DisableEnable(self):
+        """Test disabling and re-enabling IPv6 via FeatureSwitch"""
+        b = self.browser
+
+        b.wait_visible("#ipv6-method:checked")
+        b.wait_visible("#slaac-radio")
+
+        b.click("label[for='ipv6-method']")
+        b.wait_not_present("#slaac-radio")
+
+        b.click("label[for='ipv6-method']")
+        b.wait_visible("#slaac-radio")
+
+    def testIPv6MethodSwitching(self):
+        """Test switching between SLAAC, DHCPv6, and static IPv6 methods"""
+        b = self.browser
+
+        b.wait_visible("#ipv6-method:checked")
+        b.wait_visible("#slaac-radio:checked")
+
+        b.click("#dhcpv6-radio")
+        b.wait_visible("#dhcpv6-radio:checked")
+
+        b.click("#static-ipv6-radio")
+        b.wait_visible("#ipv6-address")
+
+        b.click("#slaac-radio")
+        b.wait_visible("#slaac-radio:checked")
+        b.wait_not_present("#ipv6-address")
+
+    def testIPv6RequireConnectivity(self):
+        """Test the IPv6 require connectivity checkbox"""
+        b = self.browser
+
+        b.wait_visible("#ipv6-method:checked")
+        b.wait_visible("#ipv6-require-connectivity")
+        self.assertFalse(b.is_present("#ipv6-require-connectivity:checked"))
+
+        b.click("label[for='ipv6-require-connectivity']")
+        b.wait_visible("#ipv6-require-connectivity:checked")
+
+        b.click("label[for='ipv6-require-connectivity']")
+        self.assertFalse(b.is_present("#ipv6-require-connectivity:checked"))
+
+        b.click("label[for='ipv6-method']")
+        b.wait_not_present("#ipv6-require-connectivity")
+
+        b.click("label[for='ipv6-method']")
+        b.wait_visible("#ipv6-require-connectivity")
+
+    def testIPv6DnsVersionValidation(self):
+        """Test that IPv6 DNS fields reject IPv4 addresses"""
+        b = self.browser
+
+        b.wait_visible("#ipv6-method:checked")
+
+        b.click("#manual-dns-ipv6-radio")
+        b.wait_visible("#primary-dns-ipv6")
+
+        b.set_input_text("#primary-dns-ipv6", "8.8.8.8")
+        b.focus("#secondary-dns-ipv6")
+        b.wait_in_text("#primary-dns-ipv6-helper-error", "Invalid IPv6 address format")
+
+        b.set_input_text("#primary-dns-ipv6", "2001:4860:4860::8888")
+        b.wait_not_present("#primary-dns-ipv6-helper-error")
 
 
 @testlib.onlyImage("WiFi requires mac80211_hwsim", "fedora-*")
@@ -361,6 +429,131 @@ class TestWifi(testlib.MachineCase):
 
         b.set_input_text("#wifi-password", "testpassword123")
         self.assertEqual(b.val("#wifi-password"), "testpassword123")
+
+
+@testlib.onlyImage("DHCP hostname test requires dnsmasq", "fedora-*")
+class TestDhcpHostname(testlib.MachineCase):
+    """Test that a DHCP-provided hostname (option 12) pre-populates the wizard
+
+    Sets up a dnsmasq DHCP server in a network namespace connected via a veth
+    pair. The DHCP server sends option 12 (Host Name) with a known value.
+    After NetworkManager obtains a lease the wizard should use that hostname
+    as the default on the labels step.
+    """
+
+    DHCP_HOSTNAME = "test-dhcp-hostname"
+    NS = "dhcp_hostname_ns"
+    VETH_HOST = "veth-dhcp0"
+    VETH_NS = "veth-dhcp1"
+    SUBNET = "192.168.99"
+    NM_CON = "dhcp-hostname-test"
+
+    def setUp(self):
+        super().setUp()
+        m = self.machine
+
+        m.execute("hostnamectl set-hostname localhost")
+
+        m.execute(f"ip netns add {self.NS}")
+        m.execute(
+            f"ip link add {self.VETH_HOST} type veth"
+            f" peer name {self.VETH_NS}"
+        )
+        m.execute(f"ip link set {self.VETH_NS} netns {self.NS}")
+
+        m.execute(f"ip netns exec {self.NS} ip link set lo up")
+        m.execute(
+            f"ip netns exec {self.NS} ip link set {self.VETH_NS} up"
+        )
+        m.execute(
+            f"ip netns exec {self.NS} ip addr add"
+            f" {self.SUBNET}.1/24 dev {self.VETH_NS}"
+        )
+
+        m.execute(
+            f"ip netns exec {self.NS} dnsmasq"
+            f" --listen-address={self.SUBNET}.1"
+            f" --bind-interfaces"
+            f" --no-resolv --no-hosts"
+            f" --dhcp-range={self.SUBNET}.10,{self.SUBNET}.50,"
+            f"255.255.255.0,1h"
+            f" --dhcp-option=3,{self.SUBNET}.1"
+            f" --dhcp-option=6,{self.SUBNET}.1"
+            f" --dhcp-option=12,{self.DHCP_HOSTNAME}"
+            f" --pid-file=/run/test-dhcp-hostname-dnsmasq.pid"
+        )
+
+        m.execute(
+            f"nmcli con add type ethernet ifname {self.VETH_HOST}"
+            f" con-name {self.NM_CON}"
+            f" ipv4.method auto"
+            f" ipv4.route-metric 10"
+        )
+        m.execute(f"nmcli con up {self.NM_CON}", timeout=30)
+
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            addr = m.execute(
+                f"nmcli -g IP4.ADDRESS device show {self.VETH_HOST}"
+                " 2>/dev/null || true"
+            ).strip()
+            if addr:
+                break
+            time.sleep(1)
+        else:
+            raise Exception(
+                f"veth {self.VETH_HOST} did not get a DHCP address"
+            )
+
+        dhcp_opts = m.execute(
+            f"nmcli -f DHCP4.OPTION device show {self.VETH_HOST}"
+        )
+        if self.DHCP_HOSTNAME not in dhcp_opts:
+            raise Exception(
+                f"DHCP hostname '{self.DHCP_HOSTNAME}' not found in"
+                f" NM DHCP options: {dhcp_opts}"
+            )
+
+        self.addCleanup(self._cleanup_dhcp_network)
+
+    def _cleanup_dhcp_network(self):
+        m = self.machine
+        try:
+            m.execute(
+                f"nmcli con delete {self.NM_CON} 2>/dev/null || true"
+            )
+        except Exception:
+            pass
+        try:
+            m.execute(
+                f"ip netns pids {self.NS} 2>/dev/null"
+                " | xargs -r kill 2>/dev/null || true"
+            )
+            time.sleep(1)
+            m.execute(
+                f"ip netns delete {self.NS} 2>/dev/null || true"
+            )
+        except Exception:
+            pass
+        try:
+            m.execute(
+                f"ip link del {self.VETH_HOST} 2>/dev/null || true"
+            )
+        except Exception:
+            pass
+
+    def testDhcpHostnamePrePopulated(self):
+        """Verify the DHCP hostname pre-populates the hostname input"""
+        b = self.browser
+
+        self.login_and_go(
+            "/system-onboarding", user="onboarding", password="",
+            superuser=False, tls=True,
+        )
+        navigate_to_labels_step(b)
+
+        b.wait_visible("#hostname-input")
+        self.assertEqual(b.val("#hostname-input"), self.DHCP_HOSTNAME)
 
 
 if __name__ == "__main__":

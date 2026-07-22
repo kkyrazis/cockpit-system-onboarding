@@ -273,6 +273,57 @@ class TestNtpE2E(TestNetworkServicesE2EBase):
         ).strip()
         self.assertEqual(ntp_status, "yes")
 
+    def testStaticIPv6Applied(self):
+        """Configure static IPv6 through the wizard and verify NM settings"""
+        m = self.machine
+        b = self.browser
+
+        self.login_and_go(
+            "/system-onboarding", user="onboarding", password="",
+            superuser=False, tls=True,
+        )
+
+        b.wait_visible("#networkStep")
+        b.wait_visible(IFACE_TABLE)
+        iface_radio = (
+            f"{iface_row_selector(b, IFACE_TABLE, self.production_iface)}"
+            f" input[type='radio']"
+        )
+        b.click(iface_radio)
+
+        b.click("#static-ip-radio")
+        b.wait_visible("#ipv4-address")
+        b.set_input_text("#ipv4-address", MACHINE_IP)
+        b.set_input_text("#subnet-mask", SUBNET_MASK)
+        b.set_input_text("#gateway-ip", NETSERVICES_IP)
+
+        b.click("#static-ipv6-radio")
+        b.wait_visible("#ipv6-address")
+        b.set_input_text("#ipv6-address", "fd00::10/64")
+        b.set_input_text("#gateway-ipv6", "fd00::1")
+
+        click_button_text(b, "Next")
+        b.wait_visible("#networkServicesStep")
+
+        click_button_text(b, "Next")
+
+        self.skip_enrollment_and_apply("ipv6-static-test")
+
+        with b.wait_timeout(120):
+            b.wait_in_text(
+                "#apply-success-alert",
+                "Configuration completed successfully",
+            )
+
+        nm_conn = m.execute(
+            f"nmcli -t connection show"
+            f" \"$(nmcli -t -f NAME,DEVICE con show --active"
+            f" | grep '{self.production_iface}'"
+            f" | head -1 | cut -d: -f1)\""
+        )
+        self.assertIn("ipv6.method:manual", nm_conn)
+        self.assertIn("fd00::10/64", nm_conn)
+
 
 class TestProxyE2E(TestNetworkServicesE2EBase):
     """Verify proxy configuration is applied to /etc/environment and systemd"""
