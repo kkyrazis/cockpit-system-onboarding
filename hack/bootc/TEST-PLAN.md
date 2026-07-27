@@ -233,7 +233,7 @@ for re-testing, remove the enrollment state and reboot:
 ```bash
 ssh testadmin@<agent-ip>
 sudo rm -rf /var/lib/flightctl
-sudo rm -f /var/lib/cockpit-system-onboarding/.onboarding-complete
+sudo rm -f /var/lib/flightctl-onboarding/.onboarding-complete
 sudo reboot
 ```
 

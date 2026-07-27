@@ -10,13 +10,6 @@ RUN --mount=type=cache,target=/var/cache/libdnf5 \
 
 COPY config/config-ethernet.json /etc/cockpit/system-onboarding/config.json
 
-COPY cockpit-system-onboarding-*.noarch.rpm /tmp/
-RUN --mount=type=cache,target=/var/cache/libdnf5 \
-    dnf install -y /tmp/cockpit-system-onboarding-*.noarch.rpm \
-    && rm -f /tmp/*.rpm
-
-RUN systemctl enable cockpit-system-onboarding-setup.service
-
 COPY config/firefox-policies.json /usr/lib64/firefox/distribution/policies.json
 COPY config/cage-kiosk@.service /etc/systemd/system/cage-kiosk@.service
 COPY config/cage-kiosk-start.sh /usr/libexec/cage-kiosk-start

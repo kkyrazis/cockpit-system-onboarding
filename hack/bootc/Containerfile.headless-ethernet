@@ -1,10 +1,3 @@
 FROM localhost/onboarding-agent-base:latest
 
 COPY config/config-ethernet.json /etc/cockpit/system-onboarding/config.json
-
-COPY cockpit-system-onboarding-*.noarch.rpm /tmp/
-RUN --mount=type=cache,target=/var/cache/libdnf5 \
-    dnf install -y /tmp/cockpit-system-onboarding-*.noarch.rpm \
-    && rm -f /tmp/*.rpm
-
-RUN systemctl enable cockpit-system-onboarding-setup.service

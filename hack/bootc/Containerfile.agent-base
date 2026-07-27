@@ -34,27 +34,21 @@ RUN if [ "$PLATFORM" = "rpi4" ]; then \
     dnf clean all; \
     fi
 
+COPY flightctl-onboarding-*.noarch.rpm /tmp/
 RUN --mount=type=cache,target=/var/cache/libdnf5 \
     curl -fsSLo /etc/yum.repos.d/flightctl-fedora.repo https://rpm.flightctl.io/flightctl-fedora.repo \
     && curl -fsSLo /etc/yum.repos.d/flightctl-dev.repo \
     https://copr.fedorainfracloud.org/coprs/g/redhat-et/flightctl-dev/repo/fedora-43/group_redhat-et-flightctl-dev-fedora-43.repo \
     && dnf install -y \
-    cockpit \
-    cockpit-ws \
-    cockpit-bridge \
-    NetworkManager \
-    NetworkManager-wifi \
-    wpa_supplicant \
-    hostapd \
-    dnsmasq \
-    jq \
+    /tmp/flightctl-onboarding-*.noarch.rpm \
     chrony \
     iw \
     wireless-regdb \
     linux-firmware \
     openssh-server \
     flightctl-agent \
-    flightctl-cli
+    flightctl-cli \
+    && rm -f /tmp/*.rpm
 
 RUN useradd -m -G wheel testadmin \
     && echo "testadmin:testadmin" | chpasswd \
@@ -64,7 +58,8 @@ RUN useradd -m -G wheel testadmin \
     && chmod 700 /home/testadmin/.ssh \
     && chown -R testadmin:testadmin /home/testadmin/.ssh
 
-RUN systemctl enable cockpit.socket \
+RUN systemctl enable flightctl-onboarding-setup.service \
+    && systemctl enable cockpit.socket \
     && systemctl enable sshd
 
 RUN mkdir -p /etc/flightctl/certs

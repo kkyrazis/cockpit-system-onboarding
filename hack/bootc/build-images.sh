@@ -8,7 +8,7 @@
 #
 # Prerequisites:
 #   - podman (with podman machine running on macOS)
-#   - cockpit-system-onboarding RPM built (run `make rpm` first, or let this script do it)
+#   - flightctl-onboarding RPM built (run `make rpm` first, or let this script do it)
 #
 # Usage:
 #   hack/bootc/build-images.sh [--containers-only] [--platform generic] [--only IMAGE,...]
@@ -76,8 +76,9 @@ fi
 # ---------------------------------------------------------------------------
 
 build_rpm() {
+    local rpm_dir="$REPO_ROOT/bin/rpm"
     local rpm
-    rpm=$(find "$REPO_ROOT" -maxdepth 1 -name 'cockpit-system-onboarding-*.noarch.rpm' -print -quit 2>/dev/null)
+    rpm=$(ls -t "$rpm_dir"/flightctl-onboarding-*.noarch.rpm 2>/dev/null | head -1)
 
     # Rebuild if no RPM exists or if any source file is newer than the RPM
     local needs_build=false
@@ -85,41 +86,20 @@ build_rpm() {
         needs_build=true
     elif [ -n "$(find "$REPO_ROOT/src" "$REPO_ROOT/packaging" -newer "$rpm" -print -quit 2>/dev/null)" ]; then
         echo "=== Source files changed since last RPM build ==="
-        rm -f "$rpm"
         needs_build=true
     fi
 
     if [ "$needs_build" = true ]; then
         echo "=== Building RPM... ==="
-        if [[ "$(uname -s)" == "Darwin" ]]; then
-            echo "  (building RPM in Fedora container)"
-            $SUDO_PODMAN build \
-                -t onboarding-builder:latest \
-                -f "$SCRIPT_DIR/Containerfile.builder" \
-                "$SCRIPT_DIR"
-            $SUDO_PODMAN run --rm \
-                --security-opt label=disable \
-                -v "$REPO_ROOT":/src:ro \
-                -v "$REPO_ROOT":/out \
-                onboarding-builder:latest \
-                bash -c '
-                    rsync -a --exclude=node_modules /src/ /build/
-                    git config --global --add safe.directory /build
-                    umask 022
-                    make rpm
-                    cp cockpit-system-onboarding-*.noarch.rpm /out/
-                '
-        else
-            (cd "$REPO_ROOT" && make rpm)
-        fi
-        rpm=$(find "$REPO_ROOT" -maxdepth 1 -name 'cockpit-system-onboarding-*.noarch.rpm' -print -quit)
+        (cd "$REPO_ROOT" && make rpm)
+        rpm=$(ls -t "$rpm_dir"/flightctl-onboarding-*.noarch.rpm 2>/dev/null | head -1)
     fi
     if [ -z "$rpm" ]; then
-        echo "ERROR: Could not find or build cockpit-system-onboarding RPM." >&2
+        echo "ERROR: Could not find or build flightctl-onboarding RPM." >&2
         exit 1
     fi
     echo "=== Using RPM: $(basename "$rpm") ==="
-    rm -f "$SCRIPT_DIR"/cockpit-system-onboarding-*.noarch.rpm
+    rm -f "$SCRIPT_DIR"/flightctl-onboarding-*.noarch.rpm
     cp "$rpm" "$SCRIPT_DIR/"
     RPM_FILE="$SCRIPT_DIR/$(basename "$rpm")"
 }
@@ -213,7 +193,7 @@ main() {
     build_containers
 
     if [ "$CONTAINERS_ONLY" = true ]; then
-        rm -f "$SCRIPT_DIR"/cockpit-system-onboarding-*.noarch.rpm
+        rm -f "$SCRIPT_DIR"/flightctl-onboarding-*.noarch.rpm
         echo ""
         echo "=== Container images built (--containers-only, skipping disk images) ==="
         for image in "${IMAGES[@]}"; do
@@ -230,7 +210,7 @@ main() {
         convert_to_raw "$image"
     done
 
-    rm -f "$SCRIPT_DIR"/cockpit-system-onboarding-*.noarch.rpm
+    rm -f "$SCRIPT_DIR"/flightctl-onboarding-*.noarch.rpm
 
     echo ""
     echo "=========================================="
