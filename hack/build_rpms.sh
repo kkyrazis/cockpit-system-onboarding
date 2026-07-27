@@ -40,7 +40,7 @@ run_build() {
     echo "Building RPMs in container..."
     podman run --rm \
         -v "${REPO_ROOT}:/work:z" \
-        "${git_mounts[@]}" \
+        ${git_mounts[@]+"${git_mounts[@]}"} \
         -w /work \
         "${IMAGE}" \
         bash -c '

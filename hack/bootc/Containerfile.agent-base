@@ -61,6 +61,3 @@ RUN useradd -m -G wheel testadmin \
 RUN systemctl enable flightctl-onboarding-setup.service \
     && systemctl enable cockpit.socket \
     && systemctl enable sshd
-
-RUN mkdir -p /etc/flightctl/certs
-COPY config/pki/ca.crt /etc/flightctl/certs/ca.crt
