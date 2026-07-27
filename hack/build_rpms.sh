@@ -34,6 +34,7 @@ run_build() {
         git_mounts=(-v "${git_dir}:${git_dir}:z" -v "${common_dir}:${common_dir}:z")
     fi
 
+    rm -rf "${REPO_ROOT}/rpmbuild"
     rm -f "${REPO_ROOT}"/flightctl-onboarding-*.tar.xz
     rm -f "${REPO_ROOT}/flightctl-onboarding.spec"
 
@@ -76,7 +77,7 @@ collect_rpms() {
 }
 
 cleanup() {
-    rm -rf "${REPO_ROOT}/noarch" "${REPO_ROOT}/x86_64" "${REPO_ROOT}/aarch64"
+    rm -rf "${REPO_ROOT}/rpmbuild" "${REPO_ROOT}/noarch" "${REPO_ROOT}/x86_64" "${REPO_ROOT}/aarch64"
     rm -f "${REPO_ROOT}"/*.src.rpm
 }
 
