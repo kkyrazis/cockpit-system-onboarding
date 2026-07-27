@@ -44,6 +44,7 @@ run_build() {
         -w /work \
         "${IMAGE}" \
         bash -c '
+            echo "%_builddir /tmp/rpmbuild" >> ~/.rpmmacros
             packit build locally 2>&1
             status=$?
             if [ $status -ne 0 ]; then
