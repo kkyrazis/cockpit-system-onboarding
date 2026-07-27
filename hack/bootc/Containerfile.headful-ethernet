@@ -6,7 +6,8 @@ RUN --mount=type=cache,target=/var/cache/libdnf5 \
     firefox \
     mesa-dri-drivers \
     mesa-libgbm \
-    mesa-libEGL
+    mesa-libEGL \
+    wf-recorder
 
 COPY config/config-ethernet.json /etc/cockpit/system-onboarding/config.json
 
@@ -15,6 +16,9 @@ COPY config/cage-kiosk@.service /etc/systemd/system/cage-kiosk@.service
 COPY config/cage-kiosk-start.sh /usr/libexec/cage-kiosk-start
 RUN chmod +x /usr/libexec/cage-kiosk-start
 COPY config/cage-pam /etc/pam.d/cage
+COPY config/record-kiosk.sh /usr/local/bin/record-kiosk
+RUN chmod +x /usr/local/bin/record-kiosk
+
 RUN useradd -m -s /bin/bash kiosk \
     && systemctl enable cage-kiosk@tty7.service \
     && systemctl set-default graphical.target
