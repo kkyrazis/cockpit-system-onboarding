@@ -37,20 +37,27 @@ run_build() {
     rm -f "${REPO_ROOT}"/flightctl-onboarding-*.tar.xz
     rm -f "${REPO_ROOT}/flightctl-onboarding.spec"
 
+    local output_dir="${REPO_ROOT}/bin/rpm"
+    mkdir -p "${output_dir}"
+
     echo "Building RPMs in container..."
     podman run --rm \
-        -v "${REPO_ROOT}:/work:z" \
+        -v "${REPO_ROOT}:/src:ro" \
+        -v "${output_dir}:/output" \
         ${git_mounts[@]+"${git_mounts[@]}"} \
-        -w /work \
         "${IMAGE}" \
         bash -c '
-            echo "%_builddir /tmp/rpmbuild" >> ~/.rpmmacros
+            mkdir -p /work
+            cp -a /src/. /work/
+            cd /work
+            git config --global --add safe.directory /work
             packit build locally 2>&1
             status=$?
             if [ $status -ne 0 ]; then
                 echo "ERROR: packit build failed with status $status" >&2
                 exit $status
             fi
+            cp /work/noarch/*.rpm /output/ 2>/dev/null || :
         '
 }
 
