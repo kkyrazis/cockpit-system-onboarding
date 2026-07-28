@@ -16,7 +16,7 @@
     }
   },
   "flightctl": {
-    "defaultEndpoint": "https://api.flightctl.internal:3443"
+    "defaultEndpoint": "https://flightctl.internal"
   },
   "connectivityTest": {
     "host": "flightctl.internal"
