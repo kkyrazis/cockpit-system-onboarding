@@ -146,7 +146,7 @@ rollback() {
 
     log "Rollback complete"
 }
-trap 'rc=$?; if [ $rc -ne 0 ]; then rollback; fi; exit $rc' EXIT
+trap 'rc=$?; if [ $rc -ne 0 ]; then invoke_status_hook "error"; rollback; fi; exit $rc' EXIT
 
 # Step 0: Stop onboarding network services on the target interface so NM
 # can reclaim the device cleanly.
@@ -311,6 +311,8 @@ else
     log "WARNING: Finalize script not found at $FINALIZE_SCRIPT"
 fi
 
+invoke_status_hook "success"
+
 # Step 5: Run cleanup (removes onboarding user, stops WiFi AP, starts agent)
 CLEANUP_SCRIPT="/usr/libexec/flightctl-onboarding/cleanup-onboarding.sh"
 if [ -x "$CLEANUP_SCRIPT" ]; then
@@ -320,6 +322,8 @@ if [ -x "$CLEANUP_SCRIPT" ]; then
 else
     log "WARNING: Cleanup script not found at $CLEANUP_SCRIPT"
 fi
+
+invoke_status_hook "off"
 
 log "Onboarding completed successfully"
 

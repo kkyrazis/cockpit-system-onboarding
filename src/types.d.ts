@@ -19,7 +19,7 @@ export interface SystemOnboardingConfig {
     autoReboot?: boolean;
     network?: NetworkConfig;
     flightctl?: FlightctlConfig;
-    led?: LedConfig;
+    statusHook?: StatusHookConfig;
     defaults?: ConfigDefaults;
     connectivityTest?: ConnectivityTestConfig;
     onboardingUser?: OnboardingUserConfig;
@@ -118,13 +118,12 @@ export interface OnboardingUserConfig {
     password?: string;
 }
 
-export interface LedConfig {
+export interface StatusHookConfig {
     enabled?: boolean;
     tool?: string;
-    states?: Record<LedState, string>;
 }
 
-export type LedState = "ready" | "in-progress" | "applying" | "success" | "error" | "off";
+export type StatusHookState = "ready" | "in-progress" | "applying" | "success" | "error" | "off";
 
 // ========== Runtime State Types (OnboardingSession) ==========
 

@@ -40,6 +40,7 @@ import { armWatchdog, disarmWatchdog, readWatchdogStatus } from "../services/wat
 import { testNetworkConnectivity, CancellationSignal } from "../services/connectivity";
 import { buildEnrollmentParams, executeEnrollmentScript, finalizeEnrollment } from "../services/enrollment";
 import { createSecureTempFile } from "../services/spawn-helpers";
+import { invokeStatusHook } from "../services/status-hook";
 import { FLIGHTCTL_SCRIPT_PATH, FLIGHTCTL_SERVICE_ID, getBrandName } from "../flightctl-enrollment";
 import {
     ENROLLMENT_ACTION_IDS,
@@ -720,6 +721,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         shouldCancelRef.current = false;
         signalRef.current = { cancelled: false };
         updateModel("enrollmentProgress", { executionState: "running" });
+        invokeStatusHook(config?.statusHook, "applying");
 
         await writeAttemptedMarker(model);
         const testHost = model.connectivityTestHost;
@@ -843,6 +845,7 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         updateModel("networkInterface", { wifiPassword: null });
         updateModel("enrollment", { credentials: null });
         updateModel("enrollmentProgress", { executionState: "success" });
+        invokeStatusHook(config?.statusHook, "success");
     };
 
     // Note: cleanup and reboot/finish actions are handled by the wizard footer in app.tsx
@@ -883,6 +886,12 @@ export const EnrollmentProgressPage: React.FunctionComponent<{ isApplyAuthorized
         executeEnrollment();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isApplyAuthorized, steps, hasStarted]);
+
+    useEffect(() => {
+        if (model.enrollmentProgress.executionState === "failed") {
+            invokeStatusHook(config?.statusHook, "error");
+        }
+    }, [model.enrollmentProgress.executionState, config?.statusHook]);
 
     const overallProgress =
         steps.length > 0 ? Math.round((steps.filter((s) => s.status === "success" || s.status === "warning").length / steps.length) * 100) : 0;

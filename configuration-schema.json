@@ -353,54 +353,19 @@
         }
       }
     },
-    "led": {
+    "statusHook": {
       "type": "object",
-      "description": "LED indicator configuration for visual status feedback",
+      "description": "Status hook configuration for lifecycle event notifications. The hook executable must be placed in /usr/libexec/flightctl-onboarding/hooks.d/ and is invoked with a state argument (ready, in-progress, applying, success, error, off).",
       "properties": {
         "enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Enable LED indicator control during onboarding"
+          "description": "Enable status hook invocation during onboarding lifecycle transitions"
         },
         "tool": {
           "type": "string",
-          "description": "Absolute path to the LED control executable"
-        },
-        "states": {
-          "type": "object",
-          "description": "Map LED states to tool arguments. If not specified, defaults will be used.",
-          "properties": {
-            "ready": {
-              "type": "string",
-              "default": "ready",
-              "description": "Argument for 'ready for onboarding' state (slow blink)"
-            },
-            "in-progress": {
-              "type": "string",
-              "default": "in-progress",
-              "description": "Argument for 'wizard in progress' state (pulsing)"
-            },
-            "applying": {
-              "type": "string",
-              "default": "applying",
-              "description": "Argument for 'applying configuration' state (fast blink)"
-            },
-            "success": {
-              "type": "string",
-              "default": "success",
-              "description": "Argument for 'onboarding complete' state (solid on)"
-            },
-            "error": {
-              "type": "string",
-              "default": "error",
-              "description": "Argument for 'error occurred' state (rapid blink)"
-            },
-            "off": {
-              "type": "string",
-              "default": "off",
-              "description": "Argument for 'turn off LED' state"
-            }
-          }
+          "pattern": "^[^/\\.][^/]*$",
+          "description": "Filename of the status hook executable in the hooks.d directory (no path separators)"
         }
       },
       "if": {
@@ -465,17 +430,9 @@
       "onboardingUser": {
         "password": ""
       },
-      "led": {
+      "statusHook": {
         "enabled": false,
-        "tool": "/usr/local/bin/led-control",
-        "states": {
-          "ready": "ready",
-          "in-progress": "in-progress",
-          "applying": "applying",
-          "success": "success",
-          "error": "error",
-          "off": "off"
-        }
+        "tool": "my-status-handler"
       }
     }
   ]

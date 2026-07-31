@@ -396,21 +396,39 @@ describe("validateConfig", () => {
         });
     });
 
-    describe("LED validation", () => {
+    describe("statusHook validation", () => {
         test("accepts enabled with tool", () => {
             expect(() =>
-                validateConfig(makeValidConfig({ led: { enabled: true, tool: "/usr/bin/led-ctl" } }))
+                validateConfig(makeValidConfig({ statusHook: { enabled: true, tool: "my-hook" } }))
             ).not.toThrow();
         });
 
         test("rejects enabled without tool", () => {
-            expect(() => validateConfig(makeValidConfig({ led: { enabled: true } }))).toThrow(
-                "tool path is required when LED is enabled"
+            expect(() => validateConfig(makeValidConfig({ statusHook: { enabled: true } }))).toThrow(
+                "tool is required when statusHook is enabled"
             );
         });
 
         test("accepts disabled without tool", () => {
-            expect(() => validateConfig(makeValidConfig({ led: { enabled: false } }))).not.toThrow();
+            expect(() => validateConfig(makeValidConfig({ statusHook: { enabled: false } }))).not.toThrow();
+        });
+
+        test("rejects enabled with empty tool", () => {
+            expect(() =>
+                validateConfig(makeValidConfig({ statusHook: { enabled: true, tool: "" } }))
+            ).toThrow("tool is required when statusHook is enabled");
+        });
+
+        test("rejects tool with slash", () => {
+            expect(() =>
+                validateConfig(makeValidConfig({ statusHook: { enabled: true, tool: "sub/path" } }))
+            ).toThrow("tool must be a filename only");
+        });
+
+        test("rejects tool with dot-dot", () => {
+            expect(() =>
+                validateConfig(makeValidConfig({ statusHook: { enabled: true, tool: "..evil" } }))
+            ).toThrow("tool must be a filename only");
         });
     });
 });

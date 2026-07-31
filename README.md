@@ -221,9 +221,8 @@ The override file does not need to contain all keys — only the values you want
 | `defaults.alias.mode` | string | — | Default alias mode for the device |
 | `defaults.alias.customValue` | string | `""` | Custom alias value when mode is custom |
 | `onboardingUser.password` | string | `""` | Password for the `onboarding` Cockpit user; empty = passwordless login |
-| `led.enabled` | bool | `false` | Enable LED state signaling during onboarding phases |
-| `led.tool` | string | — | Path to the LED control tool; required when `led.enabled` is `true` |
-| `led.states` | object | `{ready, in-progress, applying, success, error, off}` | Maps onboarding phases to LED state names passed to the tool |
+| `statusHook.enabled` | bool | `false` | Enable status hook invocation during onboarding lifecycle transitions |
+| `statusHook.tool` | string | — | Filename of the hook executable in `/usr/libexec/flightctl-onboarding/hooks.d/`; required when `statusHook.enabled` is `true` |
 
 ### Example override
 
@@ -254,6 +253,64 @@ To change the setup Ethernet IP, pre-populate the Flight Control endpoint, and c
     }
   }
 }
+```
+
+## Status Hook
+
+The status hook feature lets you run a custom executable at key onboarding lifecycle transitions. Your script receives a single argument — the state name — and can do anything: control LEDs, send notifications, update a display, etc.
+
+### Configuration
+
+```json
+{
+  "statusHook": {
+    "enabled": true,
+    "tool": "my-status-handler"
+  }
+}
+```
+
+### Hook placement
+
+Place your executable in `/usr/libexec/flightctl-onboarding/hooks.d/`. The directory is root-owned; only root can add or modify files there. The `statusHook.tool` value is a filename only — no paths or `..` are allowed.
+
+### Lifecycle states
+
+| State | When it fires |
+|-------|---------------|
+| `ready` | Boot — setup service starts |
+| `in-progress` | Wizard loads in the browser |
+| `applying` | User clicks Apply |
+| `success` | Configuration applied successfully |
+| `error` | Configuration failed |
+| `off` | Onboarding finished (before cleanup/reboot) |
+
+In single-NIC mode, `success`, `error`, and `off` are fired by the background apply script (since the browser connection is severed).
+
+### Failure handling
+
+Hook failures are always non-blocking — they are logged but never prevent onboarding from completing. The hook is invoked with a 5-second timeout.
+
+### Example: LED control
+
+A hook script for controlling a GPIO-connected LED on a Raspberry Pi:
+
+```bash
+#!/bin/bash
+LED_GPIO=17
+GPIO_PATH="/sys/class/gpio/gpio${LED_GPIO}"
+
+[ -d "$GPIO_PATH" ] || echo "$LED_GPIO" > /sys/class/gpio/export
+echo "out" > "$GPIO_PATH/direction"
+
+case "$1" in
+    ready)       echo 1 > "$GPIO_PATH/value" ;;
+    in-progress) echo 1 > "$GPIO_PATH/value" ;;
+    applying)    echo 1 > "$GPIO_PATH/value" ;;
+    success)     echo 1 > "$GPIO_PATH/value" ;;
+    error)       echo 0 > "$GPIO_PATH/value" ;;
+    off)         echo 0 > "$GPIO_PATH/value" ;;
+esac
 ```
 
 ## Security Model

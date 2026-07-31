@@ -158,7 +158,7 @@ All scripts are in `packaging/systemd/scripts/` unless noted otherwise.
 | `apply-proxy.sh` | Writes proxy settings to systemd drop-in and `/etc/environment`, runs `daemon-reexec` |
 | `apply-labels.sh` | Writes device labels to `/etc/flightctl/conf.d/50-cockpit-labels.yaml` |
 | `read-flightctl-config.sh` | Reads `/etc/flightctl/config.yaml` to detect existing enrollment credentials |
-| `setup-led.sh` | Initializes LED indicator to 'ready' state at boot (when LED control is enabled in config) |
+| `setup-status-hook.sh` | Invokes the user-provided status hook with `ready` state at boot (when `statusHook.enabled` is `true`) |
 | `wifi-ap-prepare.sh` | Releases the WiFi interface from NetworkManager before hostapd takes over |
 | `wifi-ap-activate.sh` | Assigns the AP IP address, starts dnsmasq/captive portal, and adds the interface to the firewalld zone |
 | `wifi-ap-teardown.sh` | Removes the interface from the firewalld zone, flushes addresses, and brings the interface down |

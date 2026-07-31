@@ -50,3 +50,6 @@ onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/run-watchdog.sh
 onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop flightctl-onboarding-watchdog.timer
 onboarding ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop flightctl-onboarding-watchdog.service
 onboarding ALL=(ALL) NOPASSWD: /usr/bin/rm -f /var/lib/flightctl-onboarding/.watchdog-active
+
+# Status hook invocation (user-provided hook in well-known directory)
+onboarding ALL=(ALL) NOPASSWD: /usr/libexec/flightctl-onboarding/hooks.d/*

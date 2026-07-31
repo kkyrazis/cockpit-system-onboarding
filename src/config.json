@@ -45,15 +45,7 @@
   "onboardingUser": {
     "password": ""
   },
-  "led": {
-    "enabled": false,
-    "states": {
-      "ready": "ready",
-      "in-progress": "in-progress",
-      "applying": "applying",
-      "success": "success",
-      "error": "error",
-      "off": "off"
-    }
+  "statusHook": {
+    "enabled": false
   }
 }

@@ -145,6 +145,55 @@ restore_setup_network() {
     done < <(systemctl list-units --plain --no-legend --all 'flightctl-onboarding-dnsmasq@*.service' 2>/dev/null | awk '{print $1}')
 }
 
+ONBOARDING_HOOKS_DIR="/usr/libexec/flightctl-onboarding/hooks.d"
+
+# Invoke the user-provided status hook with a lifecycle state argument.
+# Reads statusHook.enabled and statusHook.tool from config; validates that
+# the tool is a plain filename within hooks.d, root-owned, and executable.
+# Always returns 0 — failures are logged but never block onboarding.
+# Usage: invoke_status_hook "ready"
+invoke_status_hook() {
+    local state="$1"
+    local hook_enabled hook_tool tool_path resolved
+
+    hook_enabled=$(load_config '.statusHook.enabled' 'false')
+    [ "$hook_enabled" = "true" ] || return 0
+
+    hook_tool=$(load_config '.statusHook.tool' '')
+    [ -n "$hook_tool" ] || return 0
+
+    case "$hook_tool" in
+        */* | *..* )
+            echo "Status hook tool name contains invalid characters: $hook_tool"
+            return 0
+            ;;
+    esac
+
+    tool_path="${ONBOARDING_HOOKS_DIR}/${hook_tool}"
+
+    if [ ! -f "$tool_path" ]; then
+        echo "Status hook not found: $tool_path"
+        return 0
+    fi
+
+    if [ ! -x "$tool_path" ]; then
+        echo "Status hook not executable: $tool_path"
+        return 0
+    fi
+
+    resolved=$(realpath "$tool_path")
+    case "$resolved" in
+        "${ONBOARDING_HOOKS_DIR}/"* ) ;;
+        * )
+            echo "Status hook resolves outside hooks directory: $resolved"
+            return 0
+            ;;
+    esac
+
+    timeout 5s "$tool_path" "$state" 2>&1 || echo "Status hook failed for state '$state' (non-fatal)"
+    return 0
+}
+
 ONBOARDING_FW_ZONE="fc-onboarding-ap"
 
 # Ensure the dedicated onboarding firewalld zone exists.

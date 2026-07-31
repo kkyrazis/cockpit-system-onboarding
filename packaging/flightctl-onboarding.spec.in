@@ -73,7 +73,7 @@ install -m 644 packaging/systemd/scripts/common.sh %{buildroot}%{_libexecdir}/fl
 install -m 755 packaging/systemd/scripts/check-dependencies.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/create-onboarding-user.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/setup-network.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
-install -m 755 packaging/systemd/scripts/setup-led.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
+install -m 755 packaging/systemd/scripts/setup-status-hook.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/setup-wifi-ap.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/wifi-ap-prepare.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
 install -m 755 packaging/systemd/scripts/wifi-ap-activate.sh %{buildroot}%{_libexecdir}/flightctl-onboarding/
@@ -109,6 +109,9 @@ install -m 644 packaging/polkit/49-flightctl-onboarding.rules %{buildroot}%{_sys
 # Install example enrollment scripts
 mkdir -p %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d
 install -m 755 packaging/system-onboarding.d/*.sh %{buildroot}%{_datadir}/cockpit/system-onboarding/system-onboarding.d/
+
+# Create hooks.d directory for user-provided status hook scripts
+mkdir -p %{buildroot}%{_libexecdir}/flightctl-onboarding/hooks.d
 
 # Create state directory
 mkdir -p %{buildroot}%{_localstatedir}/lib/flightctl-onboarding
@@ -226,6 +229,7 @@ fi
 %dir %{_unitdir}/flightctl-agent.service.d
 %{_unitdir}/flightctl-agent.service.d/onboarding-gate.conf
 %{_libexecdir}/flightctl-onboarding/
+%dir %{_libexecdir}/flightctl-onboarding/hooks.d
 %config %attr(0440,root,root) %{_sysconfdir}/sudoers.d/flightctl-onboarding
 %{_sysconfdir}/polkit-1/rules.d/49-flightctl-onboarding.rules
 %dir %{_localstatedir}/lib/flightctl-onboarding

@@ -69,6 +69,7 @@ import {
 } from "./wizard/WizardSteps.ts";
 
 import { MARKER_COMPLETE, SCRIPT_CLEANUP } from "./paths";
+import { invokeStatusHook } from "./services/status-hook";
 
 const _ = cockpit.gettext;
 
@@ -166,17 +167,22 @@ export const Application = () => {
 
     // Load configuration on mount
     useEffect(() => {
-        loadConfig()
-            .then((loadedConfig) => {
+        const markerCheck = cockpit.file(MARKER_COMPLETE);
+        Promise.all([loadConfig(), markerCheck.read()])
+            .then(([loadedConfig, markerContent]) => {
                 setConfig(loadedConfig);
                 setIsConfigLoaded(true);
                 console.log("Configuration loaded successfully:", loadedConfig);
+                if (markerContent === null) {
+                    invokeStatusHook(loadedConfig.statusHook, "in-progress");
+                }
             })
             .catch((error) => {
                 console.error("Failed to load configuration:", error);
                 setConfigError(error.message || "Unknown error loading configuration");
-                setIsConfigLoaded(true); // Mark as loaded even on error to show error state
-            });
+                setIsConfigLoaded(true);
+            })
+            .finally(() => markerCheck.close());
     }, []);
 
     // Show loading while checking marker file or loading configuration
@@ -464,6 +470,7 @@ export const SystemOnboardingWizard: React.FunctionComponent<SystemOnboardingWiz
                     .catch((error) => console.warn("Cleanup failed:", error));
             const handleFinish = async () => {
                 if (!backgroundCompletion) {
+                    await invokeStatusHook(config?.statusHook, "off");
                     await runCleanup();
                 }
                 if (wantReboot) {

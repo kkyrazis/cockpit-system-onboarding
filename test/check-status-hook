@@ -1,0 +1,285 @@
+#!/usr/bin/python3 -cimport os, sys; os.execv(os.path.dirname(sys.argv[1]) + "/common/pywrap", sys.argv)
+
+"""
+Integration test for the status hook lifecycle transitions
+
+Installs a logging hook on the VM, runs the full wizard flow, and
+verifies the expected state transitions appear in the log.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+
+import testlib
+
+from wizard_navigation import (
+    IFACE_TABLE,
+    OnboardingMachineCase,
+    add_single_nic_interface,
+    click_button_text,
+    complete_enrollment_step,
+    iface_row_selector,
+    wait_for_nic,
+)
+
+HOOK_LOG = "/var/log/flightctl-onboarding-hook-test.log"
+HOOKS_DIR = "/usr/libexec/flightctl-onboarding/hooks.d"
+SCRIPTS_DIR = "/usr/libexec/flightctl-onboarding"
+HOOK_NAME = "test-logger"
+MULTI_NIC_MAC = "52:54:00:77:00:01"
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def install_status_hook_infra(machine):
+    """Install the status hook shell infrastructure and sudoers entry on the VM.
+
+    Ensures the VM has the current common.sh (with invoke_status_hook),
+    setup-status-hook.sh, the hooks.d directory, and the sudoers wildcard
+    — regardless of which RPM version the VM image was built from.
+    """
+    m = machine
+
+    m.upload(
+        [os.path.join(REPO_ROOT, "packaging/systemd/scripts/common.sh")],
+        SCRIPTS_DIR,
+    )
+    m.upload(
+        [os.path.join(REPO_ROOT, "packaging/systemd/scripts/setup-status-hook.sh")],
+        SCRIPTS_DIR,
+    )
+    m.execute(f"chmod 755 {SCRIPTS_DIR}/setup-status-hook.sh")
+    m.execute(f"mkdir -p {HOOKS_DIR}")
+
+    sudoers_line = f"onboarding ALL=(ALL) NOPASSWD: {HOOKS_DIR}/*"
+    m.execute(
+        f"grep -qF '{HOOKS_DIR}' /etc/sudoers.d/flightctl-onboarding"
+        f" || echo '{sudoers_line}' >> /etc/sudoers.d/flightctl-onboarding"
+    )
+
+    service_path = "/etc/systemd/system/flightctl-onboarding-setup.service.d/status-hook.conf"
+    m.execute(f"mkdir -p $(dirname {service_path})")
+    m.write(service_path,
+            "[Service]\nExecStart=\n"
+            f"ExecStart={SCRIPTS_DIR}/setup-status-hook.sh\n")
+    m.execute("systemctl daemon-reload")
+
+
+class TestStatusHook(OnboardingMachineCase):
+    """Test that the status hook fires at each lifecycle transition"""
+    provision = {'machine1': {'restrict': False}}
+
+    def setUp(self):
+        super().setUp()
+        m = self.machine
+
+        install_status_hook_infra(m)
+
+        m.write(f"{HOOKS_DIR}/{HOOK_NAME}",
+                f"#!/bin/bash\necho \"$1\" >> {HOOK_LOG}\n")
+        m.execute(f"chmod 755 {HOOKS_DIR}/{HOOK_NAME}")
+
+        config = {
+            "version": "1.0",
+            "runOnce": False,
+            "hideModules": False,
+            "connectivityTest": {
+                "host": "cockpit-project.org",
+                "required": False,
+            },
+            "statusHook": {
+                "enabled": True,
+                "tool": HOOK_NAME,
+            },
+        }
+        m.write(
+            "/etc/cockpit/system-onboarding/config.json",
+            json.dumps(config)
+        )
+
+        m.execute(f"rm -f {HOOK_LOG}")
+        m.execute("systemctl restart flightctl-onboarding-setup.service")
+        m.execute(
+            "systemctl is-active flightctl-onboarding-setup.service"
+            " || systemctl status flightctl-onboarding-setup.service",
+            timeout=30,
+        )
+
+        m._qemu_monitor(
+            f"netdev_add user,id=hook_net,net=10.111.115.0/24"
+        )
+        m._qemu_monitor(
+            f"device_add virtio-net-pci,netdev=hook_net,"
+            f"mac={MULTI_NIC_MAC},id=hook_dev"
+        )
+        m.execute("udevadm settle")
+        self.production_iface = wait_for_nic(m, MULTI_NIC_MAC)
+
+    def testStatusHookLifecycle(self):
+        """Test that all expected states are logged during a multi-NIC flow"""
+        b = self.browser
+        m = self.machine
+
+        log = m.execute(f"cat {HOOK_LOG} 2>/dev/null || true").strip()
+        self.assertIn("ready", log)
+
+        self.login_and_go(
+            "/system-onboarding", user="onboarding", password="",
+            superuser=False, tls=True,
+        )
+
+        b.wait_visible("#networkStep")
+        b.wait_visible(IFACE_TABLE)
+        row_sel = iface_row_selector(b, IFACE_TABLE, self.production_iface)
+        b.click(f"{row_sel} input[type='radio']")
+
+        click_button_text(b, "Next")
+        b.wait_visible("#networkServicesStep")
+        click_button_text(b, "Next")
+        complete_enrollment_step(b)
+
+        b.wait_visible("#labelsStep")
+        b.wait_visible("#hostname-input")
+        b.set_input_text("#hostname-input", "hook-test-host")
+        click_button_text(b, "Next")
+        b.wait_visible("#reviewStep")
+
+        b.click("#wizard-next-btn")
+        b.wait_in_text("#progressStep", "Apply")
+
+        with b.wait_timeout(120):
+            b.wait_in_text(
+                "#apply-success-alert",
+                "Configuration completed successfully",
+            )
+
+        click_button_text(b, "Finish")
+
+        m.execute(f"test -f {HOOK_LOG}", timeout=10)
+        log = m.execute(f"cat {HOOK_LOG}").strip()
+        states = log.splitlines()
+
+        expected = ["ready", "in-progress", "applying", "success", "off"]
+        self.assertEqual(
+            states, expected,
+            f"Expected state sequence {expected}, got {states}"
+        )
+
+
+APPLY_LOG = "/var/log/flightctl-onboarding-apply.log"
+
+
+class TestStatusHookSingleNic(OnboardingMachineCase):
+    """Test that the status hook fires correctly during single-NIC flow.
+
+    In single-NIC mode the browser connection is severed when apply starts,
+    so success/error/off are handled by apply-and-enroll.sh running as root.
+    We verify the hook log via SSH after the background script completes.
+    """
+
+    def setUp(self):
+        super().setUp()
+        m = self.machine
+        self.setup_iface = add_single_nic_interface(self)
+
+        install_status_hook_infra(m)
+
+        m.write(f"{HOOKS_DIR}/{HOOK_NAME}",
+                f"#!/bin/bash\necho \"$1\" >> {HOOK_LOG}\n")
+        m.execute(f"chmod 755 {HOOKS_DIR}/{HOOK_NAME}")
+
+        config = {
+            "version": "1.0",
+            "runOnce": False,
+            "hideModules": False,
+            "connectivityTest": {
+                "host": "cockpit-project.org",
+                "required": False,
+            },
+            "statusHook": {
+                "enabled": True,
+                "tool": HOOK_NAME,
+            },
+        }
+        m.write(
+            "/etc/cockpit/system-onboarding/config.json",
+            json.dumps(config)
+        )
+
+        m.execute(f"rm -f {HOOK_LOG} {APPLY_LOG}")
+        m.execute("systemctl restart flightctl-onboarding-setup.service")
+        m.execute(
+            "systemctl is-active flightctl-onboarding-setup.service"
+            " || systemctl status flightctl-onboarding-setup.service",
+            timeout=30,
+        )
+
+    def testStatusHookSingleNicLifecycle(self):
+        """Test that single-NIC flow logs ready, in-progress, applying, success, off"""
+        b = self.browser
+        m = self.machine
+
+        log = m.execute(f"cat {HOOK_LOG} 2>/dev/null || true").strip()
+        self.assertIn("ready", log)
+
+        self.login_and_go(
+            "/system-onboarding", user="onboarding", password="",
+            superuser=False, tls=True,
+        )
+
+        b.wait_visible("#networkStep")
+        b.wait_visible(IFACE_TABLE)
+
+        row_sel = iface_row_selector(b, IFACE_TABLE, self.setup_iface)
+        iface_radio = f"{row_sel} input[type='radio']"
+        if not b.is_present(f"{iface_radio}:checked"):
+            b.click(iface_radio)
+
+        click_button_text(b, "Next")
+        b.wait_visible("#networkServicesStep")
+        click_button_text(b, "Next")
+        complete_enrollment_step(b)
+
+        b.wait_visible("#labelsStep")
+        b.wait_visible("#hostname-input")
+        b.set_input_text("#hostname-input", "hook-singlenic")
+        click_button_text(b, "Next")
+        b.wait_visible("#reviewStep")
+
+        b.click("#wizard-next-btn")
+        b.wait_in_text("#progressStep", "Apply")
+
+        with b.wait_timeout(120):
+            b.wait_in_text(
+                "#apply-singlenic-alert",
+                "Onboarding continues in the background",
+            )
+
+        deadline = time.time() + 120
+        while time.time() < deadline:
+            try:
+                log_contents = m.execute(
+                    f"cat {APPLY_LOG} 2>/dev/null || true"
+                )
+                if "Finalize complete" in log_contents:
+                    break
+            except Exception:
+                pass
+            time.sleep(3)
+
+        m.execute(f"test -f {HOOK_LOG}", timeout=10)
+        log = m.execute(f"cat {HOOK_LOG}").strip()
+        states = log.splitlines()
+
+        expected = ["ready", "in-progress", "applying", "success", "off"]
+        self.assertEqual(
+            states, expected,
+            f"Expected state sequence {expected}, got {states}"
+        )
+
+
+if __name__ == "__main__":
+    testlib.test_main()

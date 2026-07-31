@@ -19,4 +19,6 @@ export const SCRIPT_RUN_WATCHDOG = `${SCRIPTS_DIR}/run-watchdog.sh`;
 export const SCRIPT_ROLLBACK = `${SCRIPTS_DIR}/rollback-config.sh`;
 export const SCRIPT_READ_FLIGHTCTL_CONFIG = `${SCRIPTS_DIR}/read-flightctl-config.sh`;
 
+export const HOOKS_DIR = `${SCRIPTS_DIR}/hooks.d`;
+
 export const ONBOARDING_PROFILE_PREFIX = "flightctl-onboarding-";

@@ -55,7 +55,7 @@ export const BUILT_IN_DEFAULTS: SystemOnboardingConfig = {
     onboardingUser: {
         password: "",
     },
-    led: {
+    statusHook: {
         enabled: false,
     },
     connectivityTest: {
@@ -121,10 +121,10 @@ export async function loadConfig(): Promise<SystemOnboardingConfig> {
                 ...userConfig.network?.wifiAp,
             },
         },
-        led: {
-            ...BUILT_IN_DEFAULTS.led,
-            ...defaultConfig.led,
-            ...userConfig.led,
+        statusHook: {
+            ...BUILT_IN_DEFAULTS.statusHook,
+            ...defaultConfig.statusHook,
+            ...userConfig.statusHook,
         },
         flightctl: {
             ...BUILT_IN_DEFAULTS.flightctl,
@@ -486,10 +486,13 @@ export function validateConfig(config: SystemOnboardingConfig): void {
         }
     }
 
-    // Validate LED configuration
-    if (config.led?.enabled === true) {
-        if (!config.led.tool || typeof config.led.tool !== "string") {
-            throw new Error("LED configuration: tool path is required when LED is enabled");
+    // Validate status hook configuration
+    if (config.statusHook?.enabled === true) {
+        if (!config.statusHook.tool || typeof config.statusHook.tool !== "string") {
+            throw new Error("statusHook: tool is required when statusHook is enabled");
+        }
+        if (config.statusHook.tool.includes("/") || config.statusHook.tool.includes("..")) {
+            throw new Error("statusHook: tool must be a filename only (no path separators or '..')");
         }
     }
 }
