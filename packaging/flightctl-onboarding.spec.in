@@ -7,9 +7,7 @@ License: LGPL-2.1-or-later
 Source0: %{name}-%{version}.tar.xz
 Source1: %{name}-node.tar.xz
 BuildArch: noarch
-%if ! 0%{?rhel} || 0%{?rhel} >= 10
 BuildRequires: nodejs >= 18
-%endif
 BuildRequires: make
 BuildRequires: libappstream-glib
 BuildRequires: gettext
@@ -39,11 +37,6 @@ Flightctl Onboarding Module
 
 %prep
 %autosetup -n %{name} -a 1
-# ignore pre-built bundle in release tarball and rebuild it
-# but keep it in RHEL/CentOS 9, as that has a too old nodejs
-%if ! 0%{?rhel} || 0%{?rhel} >= 10
-rm -rf dist
-%endif
 
 %build
 NODE_ENV=production BRAND_NAME="%{!?brand_name:Flight Control}%{?brand_name}" make
