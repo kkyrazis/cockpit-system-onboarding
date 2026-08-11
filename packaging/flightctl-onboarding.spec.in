@@ -4,16 +4,22 @@ Release: 1%{?dist}
 Summary: Flightctl Onboarding Module
 License: LGPL-2.1-or-later
 
+# distributions which ship nodejs-esbuild can rebuild the bundle during package build
+%if 0%{?fedora} >= 42
+%define rebuild_bundle 1
+%endif
+
 Source0: %{name}-%{version}.tar.xz
 Source1: %{name}-node.tar.xz
 BuildArch: noarch
-%if ! 0%{?rhel} || 0%{?rhel} >= 10
-BuildRequires: nodejs >= 18
-%endif
 BuildRequires: make
 BuildRequires: libappstream-glib
 BuildRequires: gettext
 BuildRequires: systemd-rpm-macros
+%if %{defined rebuild_bundle}
+BuildRequires: /usr/bin/node
+BuildRequires: nodejs-esbuild
+%endif
 
 Requires: cockpit
 Requires: cockpit-ws
@@ -38,15 +44,16 @@ Suggests: flightctl-cli
 Flightctl Onboarding Module
 
 %prep
-%autosetup -n %{name} -a 1
-# ignore pre-built bundle in release tarball and rebuild it
-# but keep it in RHEL/CentOS 9, as that has a too old nodejs
-%if ! 0%{?rhel} || 0%{?rhel} >= 10
-rm -rf dist
+%autosetup -n %{name}
+%if %{defined rebuild_bundle}
+%setup -q -D -T -a 1 -n %{name}
 %endif
 
 %build
-NODE_ENV=production BRAND_NAME="%{!?brand_name:Flight Control}%{?brand_name}" make
+%if %{defined rebuild_bundle}
+rm -rf dist
+NODE_ENV=production NODE_PATH=/usr/lib/node_modules:$(echo /usr/lib/node_modules_*) BRAND_NAME="%{!?brand_name:Flight Control}%{?brand_name}" ./build.js
+%endif
 
 %install
 %make_install PREFIX=/usr
