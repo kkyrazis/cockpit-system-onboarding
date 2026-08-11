@@ -1,4 +1,4 @@
 FROM quay.io/packit/packit:latest
 USER 0
-RUN dnf install -y nodejs npm make gettext libappstream-glib systemd-rpm-macros && dnf clean all
+RUN dnf install -y nodejs npm nodejs-esbuild make gettext libappstream-glib systemd-rpm-macros && dnf clean all
 RUN git config --global --add safe.directory '*'

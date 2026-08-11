@@ -98,7 +98,8 @@ $(SPEC): packaging/$(SPEC).in package-lock.json
 packaging/arch/PKGBUILD: packaging/arch/PKGBUILD.in
 	sed 's/VERSION/$(VERSION)/; s/SOURCE/$(TARFILE)/' $< > $@
 
-$(DIST_TEST): $(NODE_MODULES_STAMP) $(COCKPIT_REPO_STAMP) $(shell find src/ -type f) package.json build.js scripts/render-config.cjs
+$(DIST_TEST): $(COCKPIT_REPO_STAMP) $(shell find src/ -type f) package.json build.js scripts/render-config.cjs
+	@test -d node_modules || $(MAKE) $(NODE_MODULES_STAMP)
 	@mkdir -p dist
 	@if [ ! -f dist/.brand-name ] || [ "$$(cat dist/.brand-name)" != "$(BRAND_NAME)" ]; then rm -f dist/manifest.json; fi
 	NODE_ENV=$(NODE_ENV) ./build.js
